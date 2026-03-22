@@ -21,8 +21,18 @@ export interface ElectronAPI {
   onSettingsUpdated(callback: (settings: AppSettings) => void): () => void;
 }
 
+export interface SettingsAPI {
+  getSettings(): Promise<AppSettings>;
+  setSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]): Promise<void>;
+  onSettingsUpdated(callback: (settings: AppSettings) => void): () => void;
+  getAudioDevices(): Promise<string[]>;
+  getResolvedTheme(): Promise<"light" | "dark">;
+  onThemeChanged(callback: (theme: "light" | "dark") => void): () => void;
+}
+
 declare global {
   interface Window {
     api: ElectronAPI;
+    settingsApi: SettingsAPI;
   }
 }

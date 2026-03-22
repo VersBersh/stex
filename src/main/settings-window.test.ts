@@ -173,7 +173,7 @@ describe('Settings Window', () => {
     const settingsOpts = mockWindowConstructorCalls[1];
     const webPrefs = settingsOpts.webPreferences as Record<string, unknown>;
     expect(webPrefs.preload).toContain('preload');
-    expect(webPrefs.preload).toMatch(/index\.js$/);
+    expect(webPrefs.preload).toMatch(/settings-preload\.js$/);
   });
 
   it('creates settings with normal taskbar behavior', () => {

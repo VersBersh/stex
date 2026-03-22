@@ -3,10 +3,13 @@ const path = require('path');
 module.exports = {
   target: 'electron-preload',
   mode: 'development',
-  entry: './src/preload/index.ts',
+  entry: {
+    index: './src/preload/index.ts',
+    'settings-preload': './src/preload/settings-preload.ts',
+  },
   output: {
     path: path.resolve(__dirname, 'dist/preload'),
-    filename: 'index.js',
+    filename: '[name].js',
   },
   resolve: {
     extensions: ['.ts', '.js'],
