@@ -1,0 +1,1 @@
+No struggles. The conflict was straightforward — task 86 centralized text serialization to `$getDocumentText()` while task 85 extracted listener functions using the old `$getRoot().getTextContent()`. Resolution: keep the extracted functions from task 85 but use `$getDocumentText()` from the centralized contract (task 86).

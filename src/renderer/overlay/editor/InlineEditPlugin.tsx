@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import { type LexicalEditor } from 'lexical';
 import { $getDocumentText } from './lexicalTextContract';
 import type { EditorBlockManager } from './editorBlockManager';
 
@@ -7,27 +8,34 @@ interface InlineEditPluginProps {
   blockManager: EditorBlockManager;
 }
 
+export function registerInlineEditListener(
+  editor: LexicalEditor,
+  blockManager: EditorBlockManager,
+): () => void {
+  return editor.registerUpdateListener(({ editorState, prevEditorState, tags }) => {
+    // Skip programmatic updates (token commits use 'historic' tag)
+    if (tags.has('historic')) return;
+
+    const currentText = editorState.read(() => $getDocumentText());
+    const prevText = prevEditorState.read(() => $getDocumentText());
+
+    if (currentText === prevText) return;
+
+    // Skip if another listener (e.g. UserTypingPlugin) already synced the blocks
+    if (blockManager.getDocumentText() === currentText) return;
+
+    const diff = findTextDiff(prevText, currentText);
+    if (diff) {
+      blockManager.applyEdit(diff.offset, diff.removedLength, diff.insertedText);
+    }
+  });
+}
+
 export function InlineEditPlugin({ blockManager }: InlineEditPluginProps) {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
-    return editor.registerUpdateListener(({ editorState, prevEditorState, tags }) => {
-      // Skip programmatic updates (token commits use 'historic' tag)
-      if (tags.has('historic')) return;
-
-      const currentText = editorState.read(() => $getDocumentText());
-      const prevText = prevEditorState.read(() => $getDocumentText());
-
-      if (currentText === prevText) return;
-
-      // Skip if another listener (e.g. UserTypingPlugin) already synced the blocks
-      if (blockManager.getDocumentText() === currentText) return;
-
-      const diff = findTextDiff(prevText, currentText);
-      if (diff) {
-        blockManager.applyEdit(diff.offset, diff.removedLength, diff.insertedText);
-      }
-    });
+    return registerInlineEditListener(editor, blockManager);
   }, [editor, blockManager]);
 
   return null;
