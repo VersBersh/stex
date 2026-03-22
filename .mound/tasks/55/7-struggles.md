@@ -1,0 +1,1 @@
+No struggles. The conflict was straightforward — two clean merge regions in `Editor.tsx` where task 13's `TokenCommitPlugin`/`createEmptyHistoryState` additions and task 12's `GhostTextPlugin` addition both targeted the same import block and component list. Both sides were additive with no overlapping logic.

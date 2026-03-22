@@ -149,6 +149,15 @@ html, body, #root {
   font-style: italic;
 }
 
+.editor-input p:last-child::after {
+  content: var(--ghost-text-content, none);
+  color: var(--ghost-text-color);
+  font-style: italic;
+  white-space: pre-wrap;
+  user-select: none;
+  pointer-events: none;
+}
+
 .status-bar-right button.confirming {
   color: var(--confirm-color);
   border-color: var(--confirm-color);

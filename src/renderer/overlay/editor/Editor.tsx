@@ -7,6 +7,7 @@ import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
 import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { createEmptyHistoryState } from '@lexical/history';
+import { GhostTextPlugin } from './GhostTextPlugin';
 import { useOverlay } from '../OverlayContext';
 import { TokenCommitPlugin } from './TokenCommitPlugin';
 import { createEditorBlockManager } from './editorBlockManager';
@@ -42,6 +43,7 @@ export function Editor() {
         <AutoFocusPlugin />
         <EditorBridge />
         <TokenCommitPlugin blockManager={blockManager} historyState={historyState} />
+        <GhostTextPlugin />
       </LexicalComposer>
     </div>
   );
