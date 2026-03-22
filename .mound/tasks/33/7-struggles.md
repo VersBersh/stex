@@ -1,0 +1,1 @@
+No struggles. The conflict was straightforward — `src/main/index.ts` had a simple add/add conflict where both the tray task (already on main) and the hotkey task added an import and initialization call. Resolution was to include both imports and both initialization calls.

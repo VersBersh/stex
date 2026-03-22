@@ -46,8 +46,22 @@ export function getSettings(): AppSettings {
   return result;
 }
 
+const settingsListeners: Array<(settings: AppSettings) => void> = [];
+
+export function onSettingsChanged(listener: (settings: AppSettings) => void): () => void {
+  settingsListeners.push(listener);
+  return () => {
+    const idx = settingsListeners.indexOf(listener);
+    if (idx >= 0) settingsListeners.splice(idx, 1);
+  };
+}
+
 export function setSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]): void {
   store.set(key, value);
+  const updated = getSettings();
+  for (const listener of [...settingsListeners]) {
+    listener(updated);
+  }
 }
 
 export function registerSettingsIpc(): void {

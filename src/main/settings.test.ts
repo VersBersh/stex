@@ -61,6 +61,7 @@ import {
   getSettings,
   setSetting,
   registerSettingsIpc,
+  onSettingsChanged,
 } from './settings';
 import type { AppSettings } from '../shared/types';
 import { IpcChannels } from '../shared/ipc';
@@ -183,6 +184,54 @@ describe('setSetting', () => {
     mockStore.set('theme', 'dark');
     setSetting('hotkey', 'Alt+S');
     expect(mockStore.get('theme')).toBe('dark');
+  });
+});
+
+describe('onSettingsChanged', () => {
+  beforeEach(() => {
+    mockStore.clear();
+  });
+
+  it('listener is called when setSetting is invoked', () => {
+    const listener = vi.fn();
+    const unsub = onSettingsChanged(listener);
+
+    setSetting('hotkey', 'Alt+X');
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({ hotkey: 'Alt+X' }),
+    );
+
+    unsub();
+  });
+
+  it('unsubscribe removes the listener', () => {
+    const listener = vi.fn();
+    const unsub = onSettingsChanged(listener);
+
+    setSetting('hotkey', 'Alt+X');
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsub();
+
+    setSetting('hotkey', 'Alt+Y');
+    expect(listener).toHaveBeenCalledTimes(1); // not called again
+  });
+
+  it('multiple listeners are all notified', () => {
+    const listener1 = vi.fn();
+    const listener2 = vi.fn();
+    const unsub1 = onSettingsChanged(listener1);
+    const unsub2 = onSettingsChanged(listener2);
+
+    setSetting('theme', 'dark');
+
+    expect(listener1).toHaveBeenCalledTimes(1);
+    expect(listener2).toHaveBeenCalledTimes(1);
+
+    unsub1();
+    unsub2();
   });
 });
 
