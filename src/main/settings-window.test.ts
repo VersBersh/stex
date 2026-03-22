@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // --- Mock setup via vi.hoisted ---
-const { mockWindowConstructorCalls, mockLoadFileCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers, mockIpcMainHandlers } = vi.hoisted(() => {
+const { mockWindowConstructorCalls, mockLoadFileCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers, mockIpcMainHandlers, mockResolvedTheme } = vi.hoisted(() => {
   const mockWindowConstructorCalls: Array<Record<string, unknown>> = [];
   const mockLoadFileCalls: string[] = [];
   const mockDisplays: Array<{ bounds: { x: number; y: number; width: number; height: number }; workArea: { x: number; y: number; width: number; height: number } }> = [];
@@ -9,7 +9,8 @@ const { mockWindowConstructorCalls, mockLoadFileCalls, mockDisplays, mockSetting
   const mockSetSetting = vi.fn();
   const mockAppEventHandlers = new Map<string, Array<(...args: unknown[]) => void>>();
   const mockIpcMainHandlers = new Map<string, Array<(...args: unknown[]) => void>>();
-  return { mockWindowConstructorCalls, mockLoadFileCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers, mockIpcMainHandlers };
+  const mockResolvedTheme = { value: 'light' as string };
+  return { mockWindowConstructorCalls, mockLoadFileCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers, mockIpcMainHandlers, mockResolvedTheme };
 });
 
 // --- Mock electron ---
@@ -133,6 +134,11 @@ vi.mock('./settings', () => ({
   setSetting: (...args: unknown[]) => mockSetSetting(...args),
 }));
 
+// --- Mock theme ---
+vi.mock('./theme', () => ({
+  resolveTheme: () => mockResolvedTheme.value,
+}));
+
 import {
   initWindowManager,
   showSettings,
@@ -151,6 +157,7 @@ describe('Settings Window', () => {
     mockAppEventHandlers.clear();
     mockIpcMainHandlers.clear();
     Object.keys(mockSettingsData).forEach((k) => delete mockSettingsData[k]);
+    mockResolvedTheme.value = 'light';
   });
 
   it('creates a settings window', () => {
@@ -195,5 +202,22 @@ describe('Settings Window', () => {
     showSettings();
     // Should still be 2 constructor calls (overlay + 1 settings)
     expect(mockWindowConstructorCalls).toHaveLength(2);
+  });
+
+  describe('settings backgroundColor', () => {
+    it('sets light background when theme resolves to light', () => {
+      initWindowManager();
+      showSettings();
+      const settingsOpts = mockWindowConstructorCalls[1];
+      expect(settingsOpts.backgroundColor).toBe('#f5f5f5');
+    });
+
+    it('sets dark background when theme resolves to dark', () => {
+      mockResolvedTheme.value = 'dark';
+      initWindowManager();
+      showSettings();
+      const settingsOpts = mockWindowConstructorCalls[1];
+      expect(settingsOpts.backgroundColor).toBe('#1e1e1e');
+    });
   });
 });

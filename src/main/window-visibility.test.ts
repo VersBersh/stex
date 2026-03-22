@@ -132,6 +132,11 @@ vi.mock('./settings', () => ({
   setSetting: (...args: unknown[]) => mockSetSetting(...args),
 }));
 
+// --- Mock theme ---
+vi.mock('./theme', () => ({
+  resolveTheme: () => 'light',
+}));
+
 import {
   initWindowManager,
   showOverlay,

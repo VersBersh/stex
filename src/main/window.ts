@@ -1,6 +1,7 @@
 import { BrowserWindow, screen, app, ipcMain } from 'electron';
 import * as path from 'path';
 import { getSettings, setSetting } from './settings';
+import { resolveTheme } from './theme';
 import { IpcChannels } from '../shared/ipc';
 import type { AppSettings } from '../shared/types';
 
@@ -52,6 +53,7 @@ export function getValidatedPosition(
 function createOverlayWindowInternal(): BrowserWindow {
   const settings = getSettings();
   const validatedPosition = getValidatedPosition(settings);
+  const resolved = resolveTheme();
 
   const opts: Electron.BrowserWindowConstructorOptions = {
     width: settings.windowSize.width,
@@ -63,6 +65,7 @@ function createOverlayWindowInternal(): BrowserWindow {
     alwaysOnTop: true,
     skipTaskbar: true,
     show: false,
+    backgroundColor: resolved === 'dark' ? '#1e1e1e' : '#ffffff',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -250,11 +253,13 @@ export function showSettings(): void {
     return;
   }
 
+  const resolved = resolveTheme();
   settingsWindow = new BrowserWindow({
     width: 600,
     height: 500,
     frame: true,
     skipTaskbar: false,
+    backgroundColor: resolved === 'dark' ? '#1e1e1e' : '#f5f5f5',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

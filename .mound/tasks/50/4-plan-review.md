@@ -1,0 +1,10 @@
+**Verdict** — `Approved with Notes`
+
+**Plan Issues**
+1. Major — Step 1 / Step 3: The proposed `backgroundColorForTheme()` helper hard-codes `'#ffffff'` for every light-themed window, but the settings window’s actual light background is `#f5f5f5` in [src/renderer/settings/settings.css#L3](/C:/code/draftable/stex/.mound/worktrees/worker-8-30f37f49/src/renderer/settings/settings.css#L3), and `body` uses `--bg-primary` there in [src/renderer/settings/settings.css#L57](/C:/code/draftable/stex/.mound/worktrees/worker-8-30f37f49/src/renderer/settings/settings.css#L57). That makes the helper inaccurate for the settings constructor in [src/main/window.ts#L247](/C:/code/draftable/stex/.mound/worktrees/worker-8-30f37f49/src/main/window.ts#L247). Fix by either keeping per-window constants in [src/main/window.ts#L52](/C:/code/draftable/stex/.mound/worktrees/worker-8-30f37f49/src/main/window.ts#L52) and [src/main/window.ts#L247](/C:/code/draftable/stex/.mound/worktrees/worker-8-30f37f49/src/main/window.ts#L247), or making the helper take a window/surface kind so settings light mode returns `#f5f5f5`.
+2. Minor — Step 1 / Step 4: Putting a BrowserWindow color-mapping helper into [src/main/theme.ts#L1](/C:/code/draftable/stex/.mound/worktrees/worker-8-30f37f49/src/main/theme.ts#L1) is a slightly awkward fit. That module currently resolves and broadcasts `ResolvedTheme` only, via [src/main/theme.ts#L9](/C:/code/draftable/stex/.mound/worktrees/worker-8-30f37f49/src/main/theme.ts#L9) and [src/main/theme.ts#L18](/C:/code/draftable/stex/.mound/worktrees/worker-8-30f37f49/src/main/theme.ts#L18), while the actual surface colors already live in renderer CSS files. A simpler approach is to keep the small background-color mapping local to `window.ts`; if the helper stays in `theme.ts`, document why that module now owns window-surface defaults.
+
+**Spec Update Issues**
+None.
+
+I verified the referenced code and specs directly. I could not run the Vitest files in this sandbox because `npx vitest` required an uncached npm fetch.

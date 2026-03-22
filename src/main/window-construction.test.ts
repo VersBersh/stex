@@ -1,14 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // --- Mock setup via vi.hoisted ---
-const { mockWindowConstructorCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers, mockIpcMainHandlers } = vi.hoisted(() => {
+const { mockWindowConstructorCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers, mockIpcMainHandlers, mockResolvedTheme } = vi.hoisted(() => {
   const mockWindowConstructorCalls: Array<Record<string, unknown>> = [];
   const mockDisplays: Array<{ bounds: { x: number; y: number; width: number; height: number }; workArea: { x: number; y: number; width: number; height: number } }> = [];
   const mockSettingsData: Record<string, unknown> = {};
   const mockSetSetting = vi.fn();
   const mockAppEventHandlers = new Map<string, Array<(...args: unknown[]) => void>>();
   const mockIpcMainHandlers = new Map<string, Array<(...args: unknown[]) => void>>();
-  return { mockWindowConstructorCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers, mockIpcMainHandlers };
+  const mockResolvedTheme = { value: 'light' as string };
+  return { mockWindowConstructorCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers, mockIpcMainHandlers, mockResolvedTheme };
 });
 
 // --- Mock electron ---
@@ -132,6 +133,11 @@ vi.mock('./settings', () => ({
   setSetting: (...args: unknown[]) => mockSetSetting(...args),
 }));
 
+// --- Mock theme ---
+vi.mock('./theme', () => ({
+  resolveTheme: () => mockResolvedTheme.value,
+}));
+
 import {
   initWindowManager,
   getOverlayWindow,
@@ -149,6 +155,7 @@ describe('Window Construction', () => {
     mockAppEventHandlers.clear();
     mockIpcMainHandlers.clear();
     Object.keys(mockSettingsData).forEach((k) => delete mockSettingsData[k]);
+    mockResolvedTheme.value = 'light';
   });
 
   describe('initWindowManager', () => {
@@ -215,6 +222,20 @@ describe('Window Construction', () => {
     it('returns the window after init', () => {
       initWindowManager();
       expect(getOverlayWindow()).not.toBeNull();
+    });
+  });
+
+  describe('overlay backgroundColor', () => {
+    it('sets white background when theme resolves to light', () => {
+      mockResolvedTheme.value = 'light';
+      initWindowManager();
+      expect(mockWindowConstructorCalls[0].backgroundColor).toBe('#ffffff');
+    });
+
+    it('sets dark background when theme resolves to dark', () => {
+      mockResolvedTheme.value = 'dark';
+      initWindowManager();
+      expect(mockWindowConstructorCalls[0].backgroundColor).toBe('#1e1e1e');
     });
   });
 });
