@@ -141,7 +141,6 @@ import {
   initWindowManager,
   showOverlay,
   hideOverlay,
-  toggleOverlay,
   getOverlayWindow,
 } from './window';
 
@@ -209,20 +208,4 @@ describe('Window Visibility', () => {
     });
   });
 
-  describe('toggleOverlay', () => {
-    it('shows overlay when hidden', () => {
-      initWindowManager();
-      toggleOverlay();
-      const win = getOverlayWindow()!;
-      expect(win.isVisible()).toBe(true);
-    });
-
-    it('hides overlay when visible', () => {
-      initWindowManager();
-      showOverlay();
-      toggleOverlay();
-      const win = getOverlayWindow()!;
-      expect(win.isVisible()).toBe(false);
-    });
-  });
 });

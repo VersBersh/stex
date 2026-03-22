@@ -245,14 +245,6 @@ export function hideOverlay(): void {
   overlayWindow.hide();
 }
 
-export function toggleOverlay(): void {
-  if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
-    hideOverlay();
-  } else {
-    showOverlay();
-  }
-}
-
 export function showSettings(): void {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.focus();

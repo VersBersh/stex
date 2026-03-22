@@ -1,0 +1,5 @@
+**Verdict** — `Approved`
+
+The change is sound. Removing `toggleOverlay` from [window.ts](C:\code\draftable\stex\.mound\worktrees\worker-12-9aa9a179\src\main\window.ts#L230) improves SRP and reduces hidden coupling by keeping visibility primitives in the Window Manager and lifecycle-aware toggling in the Session Manager, where callers already depend on [session.ts](C:\code\draftable\stex\.mound\worktrees\worker-12-9aa9a179\src\main\session.ts#L198), [hotkey.ts](C:\code\draftable\stex\.mound\worktrees\worker-12-9aa9a179\src\main\hotkey.ts#L10), and [tray.ts](C:\code\draftable\stex\.mound\worktrees\worker-12-9aa9a179\src\main\tray.ts#L17). The test cleanup in [window-visibility.test.ts](C:\code\draftable\stex\.mound\worktrees\worker-12-9aa9a179\src\main\window-visibility.test.ts#L140) stays aligned with the public API, and the spec update in [architecture.md](C:\code\draftable\stex\.mound\worktrees\worker-12-9aa9a179\spec\architecture.md#L72) makes the module boundary clearer to a reader.
+
+No SOLID, clean-code, data-structure, or coupling issues were introduced by this diff.

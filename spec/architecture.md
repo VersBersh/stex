@@ -21,8 +21,8 @@
 |  |                  |  |                  |  |                  |  |
 |  |  - Register      |  |  - naudiodon /   |  |  - WebSocket     |  |
 |  |    global hotkey |  |    PortAudio     |  |    connection    |  |
-|  |  - Dispatch      |  |  - PCM s16le     |  |  - Send audio    |  |
-|  |    show/hide     |  |    16kHz mono    |  |  - Receive       |  |
+|  |  - Toggle via    |  |  - PCM s16le     |  |  - Send audio    |  |
+|  |    Session Mgr   |  |    16kHz mono    |  |  - Receive       |  |
 |  |                  |  |  - Stream to     |  |    tokens        |  |
 |  |                  |  |    Soniox client |  |  - Track final   |  |
 |  |                  |  |                  |  |    vs non-final  |  |
@@ -69,7 +69,7 @@
 |-----------|---------------|
 | **Tray Manager** | Creates the system tray icon, handles right-click context menu (Show/Hide, Settings, Quit) |
 | **Window Manager** | Creates two BrowserWindows: the overlay (frameless, always-on-top, no taskbar) and the settings window. Handles show/hide, persists overlay position/size |
-| **Hotkey Manager** | Registers the global hotkey via `globalShortcut`, sends show/hide commands to Window Manager |
+| **Hotkey Manager** | Registers the global hotkey via `globalShortcut`, triggers session toggle via Session Manager |
 | **Settings Store** | Reads/writes `settings.json` using `electron-store` or similar. Exposes settings to both renderers via IPC. `getSettings()` returns *effective* settings: for `sonioxApiKey`, the store applies resolution precedence (non-empty saved value > `SONIOX_API_KEY` env var > empty string) — the resolved value is never written back to disk |
 | **Audio Capture** | Opens the microphone via `naudiodon` (PortAudio bindings). Produces PCM s16le 16kHz mono chunks. Streams audio data directly to the Soniox Client. Uses the system default input device unless overridden in settings. If the selected device becomes unavailable (e.g. USB headset unplugged), stops capture and shows an error — user must resume manually after reconnecting the device. |
 | **Soniox Client** | Manages WebSocket connection to Soniox. Receives audio from Audio Capture, sends it as binary frames. Receives token responses, separates final/non-final, and forwards to renderer via IPC |
