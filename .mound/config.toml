@@ -1,0 +1,36 @@
+# Controller HTTP API port (0 = OS auto-assign)
+# controller_port = 0
+
+# Task DB server port (0 = OS auto-assign)
+# taskdb_port = 0
+
+# Merge queue server port (0 = OS auto-assign)
+# mq_port = 0
+
+# Default number of workers for mound run
+# workers = 3
+
+# Path to taskdb binary
+# taskdb_path = "taskdb"
+
+# Path to merge-queue binary
+# merge_queue_path = "merge-queue"
+
+# Path to instruction files directory
+# instructions_dir = ".mound/instructions"
+
+# Default branch name
+# main_branch = "main"
+
+# Discovery triage threshold (number of untriaged completed tasks before creating a triage task)
+# triage_threshold = 5
+
+# Tag-to-instruction-file mappings (beyond built-in defaults)
+# [instruction_tags]
+# feedback-triage = "feedback-triage.md"
+
+# How long without a heartbeat before a worker is considered dead
+# heartbeat_timeout = "60s"
+
+# How often the reaper scans for dead workers
+# reaper_interval = "15s"
