@@ -1,14 +1,20 @@
-import type { AppSettings, SonioxToken, SessionState } from './types';
+import type { AppSettings, SonioxToken, SessionState, ErrorInfo } from './types';
 
 export interface ElectronAPI {
   // Invoke (Renderer → Main, request-response)
   settingsGet(): Promise<AppSettings>;
   settingsSet<K extends keyof AppSettings>(key: K, value: AppSettings[K]): Promise<void>;
+  getResolvedTheme(): Promise<'light' | 'dark'>;
 
   // Send (Renderer → Main, fire-and-forget)
   sessionRequestPause(): void;
   sessionRequestResume(): void;
   sendSessionText(text: string): void;
+  hideWindow(): void;
+  escapeHide(): void;
+  openSettings(): void;
+  openMicSettings(): void;
+  dismissError(): void;
 
   // Listen (Main → Renderer, push events) — each returns an unsubscribe function
   onSessionStart(callback: (onShow: 'fresh' | 'append') => void): () => void;
@@ -20,6 +26,8 @@ export interface ElectronAPI {
   onSessionStatus(callback: (status: SessionState['status']) => void): () => void;
   onSettingsUpdated(callback: (settings: AppSettings) => void): () => void;
   onRequestSessionText(callback: () => void): () => void;
+  onThemeChanged(callback: (theme: 'light' | 'dark') => void): () => void;
+  onSessionError(callback: (error: ErrorInfo | null) => void): () => void;
 }
 
 export interface SettingsAPI {

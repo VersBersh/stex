@@ -1,0 +1,3 @@
+- **Category**: missing-context
+- **What happened**: The original commit (T69) didn't know about `escapeHide` (added by T16/T66 on main), so the preload migration missed it. HEAD had `window.electronAPI.escapeHide()` in OverlayContext and `escapeHide` in `src/main/preload.ts`, but the commit deleted that file and migrated everything to `window.api.*`. Had to add `escapeHide` to `src/preload/index.ts` and `src/shared/preload.d.ts` as part of the merge.
+- **What would have helped**: If the original task had been rebased onto main before implementation, it would have seen the `escapeHide` method and included it in the migration.

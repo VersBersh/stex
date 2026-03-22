@@ -1,6 +1,6 @@
 export function TitleBar() {
   const handleHide = () => {
-    window.electronAPI.hideWindow();
+    window.api.hideWindow();
   };
 
   return (

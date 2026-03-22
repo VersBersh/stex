@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IpcChannels } from '../shared/ipc';
 import type { ElectronAPI } from '../shared/preload';
-import type { AppSettings, SonioxToken, SessionState } from '../shared/types';
+import type { AppSettings, SonioxToken, SessionState, ErrorInfo } from '../shared/types';
 
 const api: ElectronAPI = {
   // Invoke (Renderer → Main, request-response)
@@ -9,10 +9,18 @@ const api: ElectronAPI = {
   settingsSet: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
     ipcRenderer.invoke(IpcChannels.SETTINGS_SET, key, value),
 
+  // Invoke (Renderer → Main, request-response)
+  getResolvedTheme: () => ipcRenderer.invoke(IpcChannels.THEME_GET),
+
   // Send (Renderer → Main, fire-and-forget)
   sessionRequestPause: () => ipcRenderer.send(IpcChannels.SESSION_REQUEST_PAUSE),
   sessionRequestResume: () => ipcRenderer.send(IpcChannels.SESSION_REQUEST_RESUME),
   sendSessionText: (text: string) => ipcRenderer.send(IpcChannels.SESSION_TEXT, text),
+  hideWindow: () => ipcRenderer.send(IpcChannels.WINDOW_HIDE),
+  escapeHide: () => ipcRenderer.send(IpcChannels.WINDOW_ESCAPE_HIDE),
+  openSettings: () => ipcRenderer.send(IpcChannels.SESSION_OPEN_SETTINGS),
+  openMicSettings: () => ipcRenderer.send(IpcChannels.SESSION_OPEN_MIC_SETTINGS),
+  dismissError: () => ipcRenderer.send(IpcChannels.SESSION_DISMISS_ERROR),
 
   // Listen (Main → Renderer, push events)
   onSessionStart: (callback: (onShow: 'fresh' | 'append') => void) => {
@@ -59,6 +67,16 @@ const api: ElectronAPI = {
     const handler = (_event: unknown, settings: AppSettings) => callback(settings);
     ipcRenderer.on(IpcChannels.SETTINGS_UPDATED, handler);
     return () => { ipcRenderer.removeListener(IpcChannels.SETTINGS_UPDATED, handler); };
+  },
+  onThemeChanged: (callback: (theme: 'light' | 'dark') => void) => {
+    const handler = (_event: unknown, theme: 'light' | 'dark') => callback(theme);
+    ipcRenderer.on(IpcChannels.THEME_RESOLVED, handler);
+    return () => { ipcRenderer.removeListener(IpcChannels.THEME_RESOLVED, handler); };
+  },
+  onSessionError: (callback: (error: ErrorInfo | null) => void) => {
+    const handler = (_event: unknown, error: ErrorInfo | null) => callback(error);
+    ipcRenderer.on(IpcChannels.SESSION_ERROR, handler);
+    return () => { ipcRenderer.removeListener(IpcChannels.SESSION_ERROR, handler); };
   },
 };
 

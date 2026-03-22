@@ -68,7 +68,7 @@
 | Component | Responsibility |
 |-----------|---------------|
 | **Tray Manager** | Creates the system tray icon, handles right-click context menu (Show/Hide, Settings, Quit) |
-| **Window Manager** | Creates two BrowserWindows: the overlay (frameless, always-on-top, no taskbar) and the settings window. Handles show/hide, persists overlay position/size |
+| **Window Manager** | Creates two BrowserWindows: the overlay (frameless, always-on-top, no taskbar) and the settings window. Handles show/hide, persists overlay position/size. Each window has exactly one preload script: the overlay loads `src/preload/index.ts` (exposes `window.api`), the settings window loads `src/preload/settings-preload.ts` (exposes `window.settingsApi`) |
 | **Hotkey Manager** | Registers the global hotkey via `globalShortcut`, triggers session toggle via Session Manager |
 | **Settings Store** | Reads/writes `settings.json` using `electron-store` or similar. Exposes settings to both renderers via IPC. `getSettings()` returns *effective* settings: for `sonioxApiKey`, the store applies resolution precedence (non-empty saved value > `SONIOX_API_KEY` env var > empty string) — the resolved value is never written back to disk |
 | **Audio Capture** | Opens the microphone via `naudiodon` (PortAudio bindings). Produces PCM s16le 16kHz mono chunks. Streams audio data directly to the Soniox Client. Uses the system default input device unless overridden in settings. If the selected device becomes unavailable (e.g. USB headset unplugged), stops capture and shows an error — user must resume manually after reconnecting the device. |
@@ -131,7 +131,7 @@ Session Manager (Main Process)
 | Renderer → Main | `settings:get` | — | Request current settings |
 | Renderer → Main | `settings:set` | `key: string, value: unknown` | Update a single setting |
 | Main → Renderer | `settings:updated` | `AppSettings` | Push settings changes |
-| Main → Renderer | `session:error` | `ErrorInfo` | Push error details for error banner display |
+| Main → Renderer | `session:error` | `ErrorInfo \| null` | Push error details for error banner display; `null` clears the current error (recovery) |
 | Renderer → Main | `session:open-settings` | — | User clicked "Open Settings" action on error banner |
 | Renderer → Main | `session:open-mic-settings` | — | User clicked "Grant access in Windows Settings" action |
 | Renderer → Main | `session:dismiss-error` | — | User dismissed error banner |
@@ -143,7 +143,6 @@ stex/
   src/
     main/
       index.ts              # Electron main entry
-      preload.ts            # Preload script: exposes IPC bridge via contextBridge
       tray.ts               # Tray Manager
       window.ts             # Window Manager (overlay + settings windows)
       hotkey.ts             # Hotkey Manager
@@ -171,11 +170,12 @@ stex/
           Hotkeys.tsx         # Hotkey customization
           History.tsx         # Transcription history (future)
     preload/
-      index.ts               # Preload bridge (contextBridge.exposeInMainWorld)
+      index.ts               # Overlay preload bridge (exposes window.api)
+      settings-preload.ts    # Settings preload bridge (exposes window.settingsApi)
     shared/
       types.ts               # Shared types (IPC channels, settings, tokens)
       ipc.ts                 # IPC channel name constants
-      preload.d.ts           # Type declarations for window.api bridge
+      preload.d.ts           # Type declarations for window.api and window.settingsApi bridges
   package.json
   electron-builder.json      # Build/packaging config
 ```

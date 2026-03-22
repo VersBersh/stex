@@ -105,7 +105,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const dismissError = useCallback(() => {
-    window.electronAPI.dismissError();
+    window.api.dismissError();
     setError(null);
   }, []);
 
@@ -113,15 +113,15 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     if (!error?.action) return;
     const action = error.action.action;
     if (action === 'open-settings') {
-      window.electronAPI.openSettings();
+      window.api.openSettings();
     } else if (action === 'open-mic-settings') {
-      window.electronAPI.openMicSettings();
+      window.api.openMicSettings();
     }
   }, [error]);
 
   // Subscribe to session status changes from main process
   useEffect(() => {
-    return window.electronAPI.onSessionStatus((newStatus) => {
+    return window.api.onSessionStatus((newStatus) => {
       setSessionStatus(newStatus as SessionState['status']);
     });
   }, []);
@@ -129,7 +129,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
   // Subscribe to session error events from main process
   // null signals error cleared (recovery)
   useEffect(() => {
-    return window.electronAPI.onSessionError((errorInfo) => {
+    return window.api.onSessionError((errorInfo) => {
       setError(errorInfo ?? null);
     });
   }, []);
@@ -179,7 +179,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        window.electronAPI.escapeHide();
+        window.api.escapeHide();
         return;
       }
 

@@ -61,6 +61,14 @@ describe('Preload bridge', () => {
       await api.settingsSet('theme', 'dark');
       expect(mockInvoke).toHaveBeenCalledWith('settings:set', 'theme', 'dark');
     });
+
+    it('getResolvedTheme calls ipcRenderer.invoke with theme:get', async () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      mockInvoke.mockResolvedValue('dark');
+      const result = await api.getResolvedTheme();
+      expect(mockInvoke).toHaveBeenCalledWith('theme:get');
+      expect(result).toBe('dark');
+    });
   });
 
   describe('send methods (Renderer → Main, fire-and-forget)', () => {
@@ -96,6 +104,30 @@ describe('Preload bridge', () => {
       api.sendSessionText('hello world');
       expect(mockSend).toHaveBeenCalledWith('session:text', 'hello world');
     });
+
+    it('hideWindow calls ipcRenderer.send with window:hide', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      api.hideWindow();
+      expect(mockSend).toHaveBeenCalledWith('window:hide');
+    });
+
+    it('openSettings calls ipcRenderer.send with session:open-settings', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      api.openSettings();
+      expect(mockSend).toHaveBeenCalledWith('session:open-settings');
+    });
+
+    it('openMicSettings calls ipcRenderer.send with session:open-mic-settings', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      api.openMicSettings();
+      expect(mockSend).toHaveBeenCalledWith('session:open-mic-settings');
+    });
+
+    it('dismissError calls ipcRenderer.send with session:dismiss-error', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      api.dismissError();
+      expect(mockSend).toHaveBeenCalledWith('session:dismiss-error');
+    });
   });
 
   describe('listener methods (Main → Renderer, push events)', () => {
@@ -108,6 +140,8 @@ describe('Preload bridge', () => {
       'onTokensNonfinal',
       'onSessionStatus',
       'onSettingsUpdated',
+      'onThemeChanged',
+      'onSessionError',
     ];
 
     for (const method of listenerMethods) {
@@ -174,6 +208,47 @@ describe('Preload bridge', () => {
       )![1] as (...args: unknown[]) => void;
       wrapper({}, 'append');
       expect(callback).toHaveBeenCalledWith('append');
+    });
+
+    it('onThemeChanged registers listener via ipcRenderer.on', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      const callback = vi.fn();
+      api.onThemeChanged(callback);
+      expect(mockOn).toHaveBeenCalledWith('theme:resolved', expect.any(Function));
+    });
+
+    it('onThemeChanged unsubscribe calls ipcRenderer.removeListener', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      const callback = vi.fn();
+      const unsubscribe = api.onThemeChanged(callback) as () => void;
+      unsubscribe();
+      expect(mockRemoveListener).toHaveBeenCalledWith('theme:resolved', expect.any(Function));
+    });
+
+    it('onSessionError registers listener via ipcRenderer.on', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      const callback = vi.fn();
+      api.onSessionError(callback);
+      expect(mockOn).toHaveBeenCalledWith('session:error', expect.any(Function));
+    });
+
+    it('onSessionError unsubscribe calls ipcRenderer.removeListener', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      const callback = vi.fn();
+      const unsubscribe = api.onSessionError(callback) as () => void;
+      unsubscribe();
+      expect(mockRemoveListener).toHaveBeenCalledWith('session:error', expect.any(Function));
+    });
+
+    it('onSessionError callback receives null for error cleared', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      const callback = vi.fn();
+      api.onSessionError(callback);
+      const wrapper = mockOn.mock.calls.find(
+        (call: unknown[]) => call[0] === 'session:error',
+      )![1] as (...args: unknown[]) => void;
+      wrapper({}, null);
+      expect(callback).toHaveBeenCalledWith(null);
     });
   });
 
