@@ -1,13 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // --- Mock setup via vi.hoisted ---
-const { mockWindowConstructorCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers } = vi.hoisted(() => {
+const { mockWindowConstructorCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers, mockIpcMainHandlers } = vi.hoisted(() => {
   const mockWindowConstructorCalls: Array<Record<string, unknown>> = [];
   const mockDisplays: Array<{ bounds: { x: number; y: number; width: number; height: number }; workArea: { x: number; y: number; width: number; height: number } }> = [];
   const mockSettingsData: Record<string, unknown> = {};
   const mockSetSetting = vi.fn();
   const mockAppEventHandlers = new Map<string, Array<(...args: unknown[]) => void>>();
-  return { mockWindowConstructorCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers };
+  const mockIpcMainHandlers = new Map<string, Array<(...args: unknown[]) => void>>();
+  return { mockWindowConstructorCalls, mockDisplays, mockSettingsData, mockSetSetting, mockAppEventHandlers, mockIpcMainHandlers };
 });
 
 // --- Mock electron ---
@@ -98,6 +99,17 @@ vi.mock('electron', () => {
         mockAppEventHandlers.get(event)!.push(handler);
       },
     },
+    ipcMain: {
+      on: (channel: string, handler: (...args: unknown[]) => void) => {
+        if (!mockIpcMainHandlers.has(channel)) {
+          mockIpcMainHandlers.set(channel, []);
+        }
+        mockIpcMainHandlers.get(channel)!.push(handler);
+      },
+      removeAllListeners: (channel: string) => {
+        mockIpcMainHandlers.delete(channel);
+      },
+    },
   };
 });
 
@@ -139,6 +151,7 @@ describe('Window Manager', () => {
     });
     mockSetSetting.mockClear();
     mockAppEventHandlers.clear();
+    mockIpcMainHandlers.clear();
     Object.keys(mockSettingsData).forEach((k) => delete mockSettingsData[k]);
   });
 

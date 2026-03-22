@@ -1,6 +1,7 @@
-import { BrowserWindow, screen, app } from 'electron';
+import { BrowserWindow, screen, app, ipcMain } from 'electron';
 import * as path from 'path';
 import { getSettings, setSetting } from './settings';
+import { IpcChannels } from '../shared/ipc';
 import type { AppSettings } from '../shared/types';
 
 let overlayWindow: BrowserWindow | null = null;
@@ -59,6 +60,7 @@ function createOverlayWindowInternal(): BrowserWindow {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
   };
 
@@ -133,6 +135,11 @@ export function initWindowManager(): void {
   isAppQuitting = false;
 
   overlayWindow = createOverlayWindowInternal();
+
+  ipcMain.removeAllListeners(IpcChannels.WINDOW_HIDE);
+  ipcMain.on(IpcChannels.WINDOW_HIDE, () => {
+    hideOverlay();
+  });
 
   app.on('before-quit', () => {
     isAppQuitting = true;

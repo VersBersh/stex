@@ -12,4 +12,5 @@ export const IpcChannels = {
   SETTINGS_GET: 'settings:get',
   SETTINGS_SET: 'settings:set',
   SETTINGS_UPDATED: 'settings:updated',
+  WINDOW_HIDE: 'window:hide',
 } as const;

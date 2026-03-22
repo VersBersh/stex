@@ -3,10 +3,13 @@ const path = require('path');
 module.exports = {
   target: 'electron-main',
   mode: 'development',
-  entry: './src/main/index.ts',
+  entry: {
+    index: './src/main/index.ts',
+    preload: './src/main/preload.ts',
+  },
   output: {
     path: path.resolve(__dirname, 'dist/main'),
-    filename: 'index.js',
+    filename: '[name].js',
   },
   resolve: {
     extensions: ['.ts', '.js'],

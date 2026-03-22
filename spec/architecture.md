@@ -125,6 +125,7 @@ Session Manager (Main Process)
 | Renderer → Main | `session:text` | `string` | Send final text for clipboard on hide |
 | Renderer → Main | `session:request-pause` | — | User clicked pause button |
 | Renderer → Main | `session:request-resume` | — | User clicked resume button |
+| Renderer → Main | `window:hide` | — | Hide the overlay window (title bar button or Escape key) |
 | Main → Renderer | `settings:updated` | `AppSettings` | Push settings changes |
 
 ## File Structure
@@ -134,6 +135,7 @@ stex/
   src/
     main/
       index.ts              # Electron main entry
+      preload.ts            # Preload script: exposes IPC bridge via contextBridge
       tray.ts               # Tray Manager
       window.ts             # Window Manager (overlay + settings windows)
       hotkey.ts             # Hotkey Manager
