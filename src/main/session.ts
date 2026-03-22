@@ -1,4 +1,3 @@
-import { ipcMain, clipboard } from 'electron';
 import { stopCapture } from './audio';
 import { getOverlayWindow, showOverlay, hideOverlay, setOverlayCloseHandler } from './window';
 import { getSettings } from './settings';
@@ -8,9 +7,9 @@ import type { SessionState, SonioxToken, ErrorInfo } from '../shared/types';
 import { registerSessionIpc } from './session-ipc';
 import { connectSoniox, finalizeSoniox, isConnected, resumeCapture, cancelReconnect, resetLifecycle } from './soniox-lifecycle';
 import { sendToRenderer, sendStatus, sendError, clearError } from './renderer-send';
+import { copyEditorTextToClipboard } from './session-clipboard';
 
 const FINALIZATION_TIMEOUT_MS = 5000;
-const CLIPBOARD_TIMEOUT_MS = 2000;
 let status: SessionState['status'] = 'idle';
 let activeTransition: Promise<void> | null = null;
 let currentFinalizationResolver: (() => void) | null = null;
@@ -37,28 +36,6 @@ function waitForFinalization(timeoutMs = FINALIZATION_TIMEOUT_MS): Promise<void>
         resolve();
       }
     };
-  });
-}
-
-function waitForClipboardText(): Promise<boolean> {
-  return new Promise<boolean>((resolve) => {
-    const handler = (_event: unknown, text: string) => {
-      clearTimeout(timer);
-      if (text && text.length > 0) {
-        clipboard.writeText(text);
-        resolve(true);
-      } else {
-        resolve(false);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      ipcMain.removeListener(IpcChannels.SESSION_TEXT, handler);
-      resolve(false);
-    }, CLIPBOARD_TIMEOUT_MS);
-
-    ipcMain.once(IpcChannels.SESSION_TEXT, handler);
-    sendToRenderer(IpcChannels.SESSION_TEXT);
   });
 }
 
@@ -144,7 +121,7 @@ async function stopSession(): Promise<void> {
 
   const settings = getSettings();
   if (settings.onHide === 'clipboard') {
-    const copied = await waitForClipboardText();
+    const copied = await copyEditorTextToClipboard(sendToRenderer);
     if (copied) {
       flashTrayIcon();
     }

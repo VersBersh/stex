@@ -1,0 +1,1 @@
+No struggles. The conflict was straightforward — task 88 had extracted `sendToRenderer` to `renderer-send.ts` (changing imports in session.ts), while task 87's commit was based on the old version. The resolution was simply keeping both import lines: the `renderer-send` import from main and the new `session-clipboard` import from the cherry-picked commit.
