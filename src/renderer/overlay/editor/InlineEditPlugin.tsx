@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { $getRoot, KEY_ENTER_COMMAND, COMMAND_PRIORITY_HIGH } from 'lexical';
+import { $getRoot } from 'lexical';
 import type { EditorBlockManager } from './editorBlockManager';
 
 interface InlineEditPluginProps {
@@ -9,16 +9,6 @@ interface InlineEditPluginProps {
 
 export function InlineEditPlugin({ blockManager }: InlineEditPluginProps) {
   const [editor] = useLexicalComposerContext();
-
-  // Enforce single-paragraph editing: the block manager tracks offsets without
-  // paragraph separators, so multi-paragraph documents would cause offset drift.
-  useEffect(() => {
-    return editor.registerCommand(
-      KEY_ENTER_COMMAND,
-      () => true, // returning true prevents default (paragraph split)
-      COMMAND_PRIORITY_HIGH,
-    );
-  }, [editor]);
 
   useEffect(() => {
     return editor.registerUpdateListener(({ editorState, prevEditorState, tags }) => {
@@ -29,6 +19,9 @@ export function InlineEditPlugin({ blockManager }: InlineEditPluginProps) {
       const prevText = prevEditorState.read(() => $getRoot().getTextContent());
 
       if (currentText === prevText) return;
+
+      // Skip if another listener (e.g. UserTypingPlugin) already synced the blocks
+      if (blockManager.getDocumentText() === currentText) return;
 
       const diff = findTextDiff(prevText, currentText);
       if (diff) {

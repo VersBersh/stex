@@ -77,4 +77,50 @@ describe('findTextDiff', () => {
       insertedText: 'owdy',
     });
   });
+
+  describe('multi-paragraph (\\n\\n separators)', () => {
+    it('detects paragraph split (Enter key)', () => {
+      expect(findTextDiff('Hello world', 'Hello\n\n world')).toEqual({
+        offset: 5,
+        removedLength: 0,
+        insertedText: '\n\n',
+      });
+    });
+
+    it('detects paragraph join (Backspace across boundary)', () => {
+      expect(findTextDiff('Hello\n\n world', 'Hello world')).toEqual({
+        offset: 5,
+        removedLength: 2,
+        insertedText: '',
+      });
+    });
+
+    it('detects text insertion in second paragraph', () => {
+      expect(findTextDiff('Hello\n\n', 'Hello\n\nworld')).toEqual({
+        offset: 7,
+        removedLength: 0,
+        insertedText: 'world',
+      });
+    });
+
+    it('detects replacement across paragraph boundary', () => {
+      expect(findTextDiff('Hello\n\nworld', 'Hello earth')).toEqual({
+        offset: 5,
+        removedLength: 7,
+        insertedText: ' earth',
+      });
+    });
+
+    it('detects Enter at end of text', () => {
+      expect(findTextDiff('Hello world', 'Hello world\n\n')).toEqual({
+        offset: 11,
+        removedLength: 0,
+        insertedText: '\n\n',
+      });
+    });
+
+    it('returns null when multi-paragraph text is unchanged', () => {
+      expect(findTextDiff('Hello\n\nworld', 'Hello\n\nworld')).toBeNull();
+    });
+  });
 });

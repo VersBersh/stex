@@ -446,6 +446,112 @@ describe('EditorBlockManager', () => {
     });
   });
 
+  describe('multi-paragraph support', () => {
+    it('mid-document paragraph split inserts \\n\\n and marks block modified', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+      manager.applyEdit(5, 0, '\n\n');
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].text).toBe('Hello\n\n world');
+      expect(blocks[0].modified).toBe(true);
+      expect(manager.getDocumentText()).toBe('Hello\n\n world');
+      expect(manager.getDocumentLength()).toBe(13);
+    });
+
+    it('tail paragraph break creates user block with \\n\\n', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+      const result = manager.applyEdit(11, 0, '\n\n');
+
+      expect(result).toBe('tail');
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks[0]).toMatchObject({ text: 'Hello world', source: 'soniox', modified: false });
+      expect(blocks[1]).toMatchObject({ text: '\n\n', source: 'user' });
+      expect(manager.getDocumentText()).toBe('Hello world\n\n');
+      expect(manager.getDocumentLength()).toBe(13);
+    });
+
+    it('typing after tail paragraph break extends user block', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+      manager.applyEdit(11, 0, '\n\n');
+      manager.applyEdit(13, 0, 'more');
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks[1].text).toBe('\n\nmore');
+      expect(manager.getDocumentText()).toBe('Hello world\n\nmore');
+    });
+
+    it('paragraph join removes \\n\\n', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+      manager.applyEdit(5, 0, '\n\n'); // split into "Hello\n\n world"
+      manager.applyEdit(5, 2, ''); // join by removing \n\n
+
+      expect(manager.getDocumentText()).toBe('Hello world');
+    });
+
+    it('token commit after mid-document paragraph break creates new soniox block', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+      manager.applyEdit(5, 0, '\n\n'); // marks soniox block modified
+
+      manager.commitFinalTokens([makeToken(' today')]);
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks[0]).toMatchObject({ text: 'Hello\n\n world', source: 'soniox', modified: true });
+      expect(blocks[1]).toMatchObject({ text: ' today', source: 'soniox', modified: false });
+      expect(manager.getDocumentText()).toBe('Hello\n\n world today');
+    });
+
+    it('getBaseText includes \\n\\n from non-trailing blocks', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+      manager.applyEdit(5, 0, '\n\n'); // soniox modified: "Hello\n\n world"
+      manager.applyEdit(13, 0, 'typed'); // tail user block
+
+      expect(manager.getBaseText()).toBe('Hello\n\n world');
+    });
+
+    it('applyEdit then replaceLastUserBlock converge for tail paragraph break', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+
+      // Simulate both plugins firing after Enter at end (InlineEditPlugin first)
+      manager.applyEdit(11, 0, '\n\n');
+      manager.replaceLastUserBlock('\n\n');
+
+      expect(manager.getDocumentText()).toBe('Hello world\n\n');
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks[1].text).toBe('\n\n');
+
+      // Simulate both plugins firing after typing "more" in second paragraph
+      manager.applyEdit(13, 0, 'more');
+      manager.replaceLastUserBlock('\n\nmore');
+
+      expect(manager.getDocumentText()).toBe('Hello world\n\nmore');
+      expect(manager.getBlocks()[1].text).toBe('\n\nmore');
+    });
+
+    it('replaceLastUserBlock then applyEdit — reverse order is safe when guarded', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+
+      // Simulate UserTypingPlugin running first (reverse order)
+      manager.replaceLastUserBlock('\n\n');
+
+      // After replaceLastUserBlock, getDocumentText() = "Hello world\n\n"
+      // InlineEditPlugin should check getDocumentText() === currentText and skip.
+      // If it does NOT skip, this applyEdit would corrupt state:
+      expect(manager.getDocumentText()).toBe('Hello world\n\n');
+
+      // The idempotency guard in InlineEditPlugin prevents this applyEdit from running.
+      // Here we verify that the block state is correct after replaceLastUserBlock alone.
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks[0]).toMatchObject({ text: 'Hello world', source: 'soniox' });
+      expect(blocks[1]).toMatchObject({ text: '\n\n', source: 'user' });
+    });
+  });
+
   describe('independent instances', () => {
     it('each manager has independent block state', () => {
       const manager2 = createEditorBlockManager();

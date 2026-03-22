@@ -58,6 +58,8 @@ interface EditorBlock {
 
 EditorBlocks are **not** 1:1 with Lexical nodes. The Lexical editor uses standard `ParagraphNode` and `TextNode` types. The block list is maintained as a separate data structure alongside the editor state. Block boundaries are tracked by character offset ranges within the document. This avoids the complexity of custom Lexical node types while still preserving ownership metadata.
 
+Paragraph boundaries in Lexical (multiple `ParagraphNode` children of the root) are represented as newline characters within block text, matching the separator returned by Lexical's `$getRoot().getTextContent()` (currently `\n\n`). When a user splits or joins paragraphs, these characters are inserted or removed via the standard `applyEdit` mechanism — no special handling is needed. The block manager's offset model (character-level) naturally accounts for them as regular characters.
+
 ### Undo/Redo Scope
 
 Only user edits (typing, deleting, pasting) are part of the Lexical undo history. Programmatic appends of transcribed text are **not** undoable — `Ctrl+Z` never removes transcription output.
