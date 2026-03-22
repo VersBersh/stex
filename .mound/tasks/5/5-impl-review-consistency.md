@@ -1,0 +1,12 @@
+- **Verdict** — `Approved with Notes`
+
+- **Progress**
+  - `[Done]` Step 1: Implement `src/main/tray.ts` — the tray manager is in place with module-level state, embedded icon creation, tooltip, context menu, and `destroyTray()` in [src/main/tray.ts:1](/C:/code/draftable/stex/.mound/worktrees/worker-6-9e426e04/src/main/tray.ts#L1).
+  - `[Done]` Step 2: Wire tray init into app entry point — `initTray()` is imported and called after `initWindowManager()` in [src/main/index.ts:1](/C:/code/draftable/stex/.mound/worktrees/worker-6-9e426e04/src/main/index.ts#L1).
+  - `[Partially done]` Step 3: Write tests for `src/main/tray.test.ts` — the file exists and covers the core menu behaviors and re-init path in [src/main/tray.test.ts:1](/C:/code/draftable/stex/.mound/worktrees/worker-6-9e426e04/src/main/tray.test.ts#L1), but it is currently untracked and one planned behavior is only indirectly covered.
+
+- **Issues**
+  1. **Major** — [src/main/tray.test.ts](/C:/code/draftable/stex/.mound/worktrees/worker-6-9e426e04/src/main/tray.test.ts) is untracked, so the planned test work is not actually part of `git diff HEAD` and could be omitted from the final commit entirely. The implementation notes say step 3 is done, but the patch under review only contains [src/main/index.ts](/C:/code/draftable/stex/.mound/worktrees/worker-6-9e426e04/src/main/index.ts) and [src/main/tray.ts](/C:/code/draftable/stex/.mound/worktrees/worker-6-9e426e04/src/main/tray.ts). Suggested fix: add `src/main/tray.test.ts` to version control before landing this task.
+  2. **Minor** — The `destroyTray()` test block in [src/main/tray.test.ts:155](/C:/code/draftable/stex/.mound/worktrees/worker-6-9e426e04/src/main/tray.test.ts#L155) checks destruction but does not actually verify the planned “sets it to null” reset semantics. A stale internal `tray` reference after destroy would still pass the current tests. Suggested fix: add an indirect assertion such as `initTray(); destroyTray(); initTray();` and verify the second init creates a fresh live tray without interacting with the previously destroyed instance.
+
+The production code itself looks sound: the tray wiring follows the plan, the menu callbacks target the correct window-manager functions, and I do not see an obvious regression in the startup path or caller relationships.
