@@ -1,1 +1,13 @@
-export {};
+export const IpcChannels = {
+  SESSION_START: 'session:start',
+  SESSION_STOP: 'session:stop',
+  SESSION_PAUSED: 'session:paused',
+  SESSION_RESUMED: 'session:resumed',
+  TOKENS_FINAL: 'tokens:final',
+  TOKENS_NONFINAL: 'tokens:nonfinal',
+  SESSION_STATUS: 'session:status',
+  SESSION_TEXT: 'session:text',
+  SESSION_REQUEST_PAUSE: 'session:request-pause',
+  SESSION_REQUEST_RESUME: 'session:request-resume',
+  SETTINGS_UPDATED: 'settings:updated',
+} as const;
