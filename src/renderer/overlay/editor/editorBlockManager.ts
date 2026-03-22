@@ -39,6 +39,35 @@ export function createEditorBlockManager() {
       }
     },
 
+    replaceLastUserBlock(text: string): void {
+      const lastBlock = blocks[blocks.length - 1];
+      if (lastBlock && lastBlock.source === 'user') {
+        if (text.length === 0) {
+          blocks.pop();
+        } else {
+          lastBlock.text = text;
+        }
+      } else if (text.length > 0) {
+        blocks.push({
+          id: generateBlockId(),
+          text,
+          source: 'user',
+          modified: false,
+        });
+      }
+    },
+
+    getBaseText(): string {
+      if (blocks.length === 0) return '';
+      const lastBlock = blocks[blocks.length - 1];
+      const end = lastBlock.source === 'user' ? blocks.length - 1 : blocks.length;
+      let text = '';
+      for (let i = 0; i < end; i++) {
+        text += blocks[i].text;
+      }
+      return text;
+    },
+
     clear(): void {
       blocks = [];
     },

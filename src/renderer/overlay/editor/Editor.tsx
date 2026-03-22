@@ -12,6 +12,7 @@ import { useOverlay } from '../OverlayContext';
 import { TokenCommitPlugin } from './TokenCommitPlugin';
 import { createEditorBlockManager } from './editorBlockManager';
 import { InlineEditPlugin } from './InlineEditPlugin';
+import { UserTypingPlugin } from './UserTypingPlugin';
 
 const initialConfig = {
   namespace: 'StexEditor',
@@ -45,6 +46,7 @@ export function Editor() {
         <EditorBridge />
         <TokenCommitPlugin blockManager={blockManager} historyState={historyState} />
         <InlineEditPlugin blockManager={blockManager} />
+        <UserTypingPlugin blockManager={blockManager} />
         <GhostTextPlugin />
       </LexicalComposer>
     </div>

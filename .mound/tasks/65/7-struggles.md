@@ -1,0 +1,1 @@
+No struggles. The conflict was straightforward — both T14 (InlineEditPlugin + applyEdit) and T15 (UserTypingPlugin + replaceLastUserBlock/getBaseText) added content to the same insertion points in Editor.tsx and editorBlockManager.test.ts. The resolution was to keep both additions side by side. editorBlockManager.ts merged cleanly without conflicts.

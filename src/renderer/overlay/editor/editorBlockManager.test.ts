@@ -298,6 +298,154 @@ describe('EditorBlockManager', () => {
     });
   });
 
+  describe('replaceLastUserBlock', () => {
+    it('creates a new user block when no blocks exist', () => {
+      manager.replaceLastUserBlock('hello');
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toMatchObject({
+        text: 'hello',
+        source: 'user',
+        modified: false,
+      });
+    });
+
+    it('creates a new user block after a soniox block', () => {
+      manager.commitFinalTokens([makeToken('spoken ')]);
+      manager.replaceLastUserBlock('typed');
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks[0]).toMatchObject({ text: 'spoken ', source: 'soniox' });
+      expect(blocks[1]).toMatchObject({ text: 'typed', source: 'user' });
+    });
+
+    it('replaces text of an existing trailing user block', () => {
+      manager.replaceLastUserBlock('first');
+      manager.replaceLastUserBlock('replaced');
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].text).toBe('replaced');
+    });
+
+    it('removes trailing user block when text is empty', () => {
+      manager.replaceLastUserBlock('temp');
+      expect(manager.getBlocks()).toHaveLength(1);
+
+      manager.replaceLastUserBlock('');
+      expect(manager.getBlocks()).toHaveLength(0);
+    });
+
+    it('is a no-op when text is empty and last block is soniox', () => {
+      manager.commitFinalTokens([makeToken('spoken')]);
+      manager.replaceLastUserBlock('');
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].source).toBe('soniox');
+    });
+
+    it('is a no-op when text is empty and no blocks exist', () => {
+      manager.replaceLastUserBlock('');
+      expect(manager.getBlocks()).toHaveLength(0);
+    });
+
+    it('preserves the block ID when replacing text', () => {
+      manager.replaceLastUserBlock('first');
+      const id = manager.getBlocks()[0].id;
+
+      manager.replaceLastUserBlock('second');
+      expect(manager.getBlocks()[0].id).toBe(id);
+    });
+  });
+
+  describe('getBaseText', () => {
+    it('returns empty string when no blocks exist', () => {
+      expect(manager.getBaseText()).toBe('');
+    });
+
+    it('returns all block text when last block is soniox', () => {
+      manager.commitFinalTokens([makeToken('Hello ')]);
+      manager.commitFinalTokens([makeToken('world')]);
+
+      expect(manager.getBaseText()).toBe('Hello world');
+    });
+
+    it('returns text of all blocks except trailing user block', () => {
+      manager.commitFinalTokens([makeToken('spoken ')]);
+      manager.replaceLastUserBlock('typed');
+
+      expect(manager.getBaseText()).toBe('spoken ');
+    });
+
+    it('returns empty string when only block is a user block', () => {
+      manager.replaceLastUserBlock('typed');
+
+      expect(manager.getBaseText()).toBe('');
+    });
+
+    it('includes earlier user blocks that are not trailing', () => {
+      manager.replaceLastUserBlock('first-user ');
+      manager.commitFinalTokens([makeToken('spoken ')]);
+      manager.replaceLastUserBlock('second-user');
+
+      // base text = first-user + spoken (not trailing second-user)
+      expect(manager.getBaseText()).toBe('first-user spoken ');
+    });
+  });
+
+  describe('block alternation', () => {
+    it('soniox then user then soniox creates 3 alternating blocks', () => {
+      manager.commitFinalTokens([makeToken('edit the ')]);
+      manager.replaceLastUserBlock('~/.gitignore');
+      manager.commitFinalTokens([makeToken(' file')]);
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(3);
+      expect(blocks[0]).toMatchObject({ text: 'edit the ', source: 'soniox' });
+      expect(blocks[1]).toMatchObject({ text: '~/.gitignore', source: 'user' });
+      expect(blocks[2]).toMatchObject({ text: ' file', source: 'soniox' });
+      expect(manager.getDocumentText()).toBe('edit the ~/.gitignore file');
+    });
+
+    it('soniox then user then soniox then user creates 4 blocks', () => {
+      manager.commitFinalTokens([makeToken('A ')]);
+      manager.replaceLastUserBlock('B ');
+      manager.commitFinalTokens([makeToken('C ')]);
+      manager.replaceLastUserBlock('D');
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(4);
+      expect(blocks.map(b => b.source)).toEqual(['soniox', 'user', 'soniox', 'user']);
+      expect(manager.getDocumentText()).toBe('A B C D');
+    });
+
+    it('commitFinalTokens after user block creates a new soniox block', () => {
+      manager.replaceLastUserBlock('typed');
+      manager.commitFinalTokens([makeToken(' spoken')]);
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks[0].source).toBe('user');
+      expect(blocks[1].source).toBe('soniox');
+    });
+
+    it('deleting user text then new soniox merges into previous soniox', () => {
+      manager.commitFinalTokens([makeToken('first ')]);
+      manager.replaceLastUserBlock('temp');
+      // User deletes their typed text
+      manager.replaceLastUserBlock('');
+      // New soniox arrives — should merge into the first soniox block
+      manager.commitFinalTokens([makeToken('second')]);
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toMatchObject({ text: 'first second', source: 'soniox' });
+    });
+  });
+
   describe('independent instances', () => {
     it('each manager has independent block state', () => {
       const manager2 = createEditorBlockManager();
