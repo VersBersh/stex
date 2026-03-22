@@ -7,6 +7,7 @@ import { IpcChannels } from '../shared/ipc';
 import type { SessionState, SonioxToken, ErrorInfo } from '../shared/types';
 import { registerSessionIpc } from './session-ipc';
 import { connectSoniox, finalizeSoniox, isConnected, resumeCapture, cancelReconnect, resetLifecycle } from './soniox-lifecycle';
+import { sendToRenderer, sendStatus, sendError, clearError } from './renderer-send';
 
 const FINALIZATION_TIMEOUT_MS = 5000;
 const CLIPBOARD_TIMEOUT_MS = 2000;
@@ -14,25 +15,6 @@ let status: SessionState['status'] = 'idle';
 let activeTransition: Promise<void> | null = null;
 let currentFinalizationResolver: (() => void) | null = null;
 let initialized = false;
-
-function sendToRenderer(channel: string, ...args: unknown[]): void {
-  const win = getOverlayWindow();
-  if (win && !win.isDestroyed()) {
-    win.webContents.send(channel, ...args);
-  }
-}
-
-function sendStatus(): void {
-  sendToRenderer(IpcChannels.SESSION_STATUS, status);
-}
-
-function sendError(error: ErrorInfo | null): void {
-  sendToRenderer(IpcChannels.SESSION_ERROR, error);
-}
-
-function clearError(): void {
-  sendError(null);
-}
 
 function waitForFinalization(timeoutMs = FINALIZATION_TIMEOUT_MS): Promise<void> {
   return new Promise<void>((resolve) => {
@@ -90,7 +72,7 @@ function createLifecycleCallbacks() {
     },
     onStatusChange: (newStatus: SessionState['status']) => {
       status = newStatus;
-      sendStatus();
+      sendStatus(status);
     },
     onError: (error: ErrorInfo | null) => {
       sendError(error);
@@ -105,7 +87,7 @@ function startSession(): void {
   if (status !== 'idle') return;
 
   status = 'connecting';
-  sendStatus();
+  sendStatus(status);
 
   const settings = getSettings();
   sendToRenderer(IpcChannels.SESSION_START, settings.onShow);
@@ -124,7 +106,7 @@ async function pauseSession(): Promise<void> {
 
   sendToRenderer(IpcChannels.TOKENS_NONFINAL, []);
   sendToRenderer(IpcChannels.SESSION_PAUSED);
-  sendStatus();
+  sendStatus(status);
 }
 
 function resumeSession(): void {
@@ -139,7 +121,7 @@ function resumeSession(): void {
 
   sendToRenderer(IpcChannels.SESSION_RESUMED);
   status = 'recording';
-  sendStatus();
+  sendStatus(status);
 }
 
 async function stopSession(): Promise<void> {
@@ -148,7 +130,7 @@ async function stopSession(): Promise<void> {
   cancelReconnect();
 
   status = 'finalizing';
-  sendStatus();
+  sendStatus(status);
 
   stopCapture();
 
@@ -173,7 +155,7 @@ async function stopSession(): Promise<void> {
   hideOverlay();
 
   status = 'idle';
-  sendStatus();
+  sendStatus(status);
 }
 
 export function requestToggle(): void {
@@ -219,7 +201,7 @@ export function requestQuickDismiss(): void {
     resetLifecycle();
 
     status = 'idle';
-    sendStatus();
+    sendStatus(status);
   }
 
   hideOverlay();
@@ -239,7 +221,7 @@ export function initSessionManager(): void {
         cancelReconnect();
         resetLifecycle();
         status = 'idle';
-        sendStatus();
+        sendStatus(status);
         clearError();
       }
     },
