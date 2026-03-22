@@ -15,11 +15,11 @@ The app runs persistently in the system tray and toggles its window via a global
 
 ### First-Run Experience
 
-On first launch (no `settings.json` exists or no API key configured):
+On first launch (no API key available — see [Stored vs Effective Settings](../models.md#stored-vs-effective-settings)):
 
 1. The **settings window** opens automatically to the API key configuration page
 2. The overlay window does not appear until a valid API key is saved
-3. If the user presses the global hotkey without an API key configured, the overlay shows a single-line message: "Set up your API key in Settings to start transcribing" with a clickable link to open the settings window
+3. If the user presses the global hotkey without an API key available, the overlay shows a single-line message: "Set up your API key in Settings to start transcribing" with a clickable link to open the settings window
 4. Once a valid API key is saved, the app behaves normally
 
 ### Microphone Permission
