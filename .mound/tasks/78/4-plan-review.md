@@ -1,0 +1,13 @@
+**Verdict** — `Approved with Notes`
+
+**Plan Issues**
+1. **Major** — **Step 2 / Step 3**: the reset contract for the extracted Soniox lifecycle is underspecified. Today, session shutdown and re-init explicitly clear reconnect state in [session.ts](/C:/code/draftable/stex/.mound/worktrees/worker-11-10dca67e/src/main/session.ts) before stopping or reinitializing. In the proposed design, `teardown()` only disconnects and nulls the client, so a pending reconnect timer could survive a stop, quick dismiss, or `initSessionManager()` re-init if the implementation follows the plan literally. Suggested fix: define a single lifecycle reset API that clears the client, timer, and attempt counter, and call that from every existing cleanup path.
+
+2. **Major** — **Step 4**: the verification plan misses the highest-risk regression introduced by the refactor: duplicate IPC handlers after re-init. The current module goes out of its way to remove old listeners on every `initSessionManager()` call in [session.ts](/C:/code/draftable/stex/.mound/worktrees/worker-11-10dca67e/src/main/session.ts), but the existing tests in [session.test.ts](/C:/code/draftable/stex/.mound/worktrees/worker-11-10dca67e/src/main/session.test.ts) and [session-reconnect.test.ts](/C:/code/draftable/stex/.mound/worktrees/worker-11-10dca67e/src/main/session-reconnect.test.ts) only verify single-init registration. Suggested fix: add a regression test that calls `initSessionManager()` twice and proves each IPC path still fires exactly once.
+
+3. **Minor** — **Step 2**: the proposed extraction weakens type boundaries compared with the existing code. Status is currently typed via `SessionState['status']` in [types.ts](/C:/code/draftable/stex/.mound/worktrees/worker-11-10dca67e/src/shared/types.ts), but the plan sketches `onStatusChange(status: string)` and raw channel-string plumbing. Suggested fix: keep the extracted API typed to `SessionState['status']`, and prefer typed callbacks for final tokens, non-final tokens, and errors instead of a generic `sendToRenderer(channel, ...args)` interface.
+
+**Spec Update Issues**
+None. `2-spec-updates.md` is consistent with the repo as checked: there is no `specs/` directory, and the plan does not change the external contracts in [ipc.ts](/C:/code/draftable/stex/.mound/worktrees/worker-11-10dca67e/src/shared/ipc.ts) or [types.ts](/C:/code/draftable/stex/.mound/worktrees/worker-11-10dca67e/src/shared/types.ts).
+
+I could not execute the proposed `vitest` command in this workspace because dependencies are not installed here (`node_modules` is absent), so the review is based on the task docs, source, and test code rather than a live test run.
