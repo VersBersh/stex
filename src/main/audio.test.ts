@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EventEmitter } from 'events';
 
-const { mockDevices, mockSettings, lastCreatedStream, mockGetDevices, SampleFormat16Bit } = vi.hoisted(() => {
+const { mockDevices, mockSettings, lastCreatedStream, mockGetDevices, SampleFormat16Bit, mockHandlers } = vi.hoisted(() => {
   const mockDevices = [
     { id: 0, name: 'Built-in Microphone', maxInputChannels: 2, maxOutputChannels: 0, defaultSampleRate: 44100 },
     { id: 1, name: 'USB Headset', maxInputChannels: 1, maxOutputChannels: 2, defaultSampleRate: 48000 },
@@ -23,7 +23,9 @@ const { mockDevices, mockSettings, lastCreatedStream, mockGetDevices, SampleForm
   const mockGetDevices = vi.fn(() => [...mockDevices]);
   const SampleFormat16Bit = 16;
 
-  return { mockDevices, mockSettings, lastCreatedStream, mockGetDevices, SampleFormat16Bit };
+  const mockHandlers = new Map<string, (...args: unknown[]) => unknown>();
+
+  return { mockDevices, mockSettings, lastCreatedStream, mockGetDevices, SampleFormat16Bit, mockHandlers };
 });
 
 vi.mock('naudiodon', () => {
@@ -52,11 +54,20 @@ vi.mock('naudiodon', () => {
   };
 });
 
+vi.mock('electron', () => ({
+  ipcMain: {
+    handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
+      mockHandlers.set(channel, handler);
+    },
+  },
+}));
+
 vi.mock('./settings', () => ({
   getSettings: () => mockSettings,
 }));
 
-import { listDevices, startCapture, stopCapture } from './audio';
+import { listDevices, startCapture, stopCapture, registerAudioIpc } from './audio';
+import { IpcChannels } from '../shared/ipc';
 
 describe('listDevices', () => {
   beforeEach(() => {
@@ -208,5 +219,24 @@ describe('stream error handling', () => {
 
     expect(() => startCapture(vi.fn(), vi.fn())).not.toThrow();
     stopCapture();
+  });
+});
+
+describe('registerAudioIpc', () => {
+  beforeEach(() => {
+    mockHandlers.clear();
+  });
+
+  it('registers a handler for AUDIO_GET_DEVICES', () => {
+    registerAudioIpc();
+    expect(mockHandlers.has(IpcChannels.AUDIO_GET_DEVICES)).toBe(true);
+  });
+
+  it('AUDIO_GET_DEVICES handler returns an empty array', async () => {
+    registerAudioIpc();
+    const handler = mockHandlers.get(IpcChannels.AUDIO_GET_DEVICES)!;
+    const result = await handler({});
+    expect(result).toEqual([]);
+    expect(Array.isArray(result)).toBe(true);
   });
 });

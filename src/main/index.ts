@@ -3,9 +3,11 @@ import { initWindowManager } from './window';
 import { registerSettingsIpc } from './settings';
 import { initTray } from './tray';
 import { initHotkeyManager } from './hotkey';
+import { registerAudioIpc } from './audio';
 
 app.whenReady().then(() => {
   registerSettingsIpc();
+  registerAudioIpc();
   initWindowManager();
   initTray();
   initHotkeyManager();

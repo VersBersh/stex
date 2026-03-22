@@ -13,4 +13,5 @@ export const IpcChannels = {
   SETTINGS_SET: 'settings:set',
   SETTINGS_UPDATED: 'settings:updated',
   WINDOW_HIDE: 'window:hide',
+  AUDIO_GET_DEVICES: 'audio:get-devices',
 } as const;

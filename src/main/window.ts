@@ -248,6 +248,7 @@ export function showSettings(): void {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload-settings.js'),
     },
   });
 

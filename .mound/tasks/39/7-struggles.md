@@ -1,0 +1,1 @@
+No struggles. All three conflicts (src/main/index.ts, src/shared/ipc.ts, webpack.main.config.js) were clean additive merges — HEAD added one thing, the incoming commit added another, and both were needed.

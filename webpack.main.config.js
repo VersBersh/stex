@@ -6,6 +6,7 @@ module.exports = {
   entry: {
     index: './src/main/index.ts',
     preload: './src/main/preload.ts',
+    'preload-settings': './src/main/preload-settings.ts',
   },
   output: {
     path: path.resolve(__dirname, 'dist/main'),

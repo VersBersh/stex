@@ -1,6 +1,8 @@
+import { ipcMain } from 'electron';
 import portAudio, { IoStreamRead } from 'naudiodon';
 import { getSettings } from './settings';
 import type { AudioDevice } from '../shared/types';
+import { IpcChannels } from '../shared/ipc';
 
 let activeStream: IoStreamRead | null = null;
 
@@ -75,4 +77,10 @@ export function stopCapture(): void {
   const stream = activeStream;
   activeStream = null;
   stream.quit();
+}
+
+export function registerAudioIpc(): void {
+  ipcMain.handle(IpcChannels.AUDIO_GET_DEVICES, () => {
+    return [];
+  });
 }
