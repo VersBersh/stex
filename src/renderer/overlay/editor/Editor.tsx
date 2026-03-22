@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -6,7 +6,10 @@ import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin';
 import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
 import { AutoFocusPlugin } from '@lexical/react/LexicalAutoFocusPlugin';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import { createEmptyHistoryState } from '@lexical/history';
 import { useOverlay } from '../OverlayContext';
+import { TokenCommitPlugin } from './TokenCommitPlugin';
+import { createEditorBlockManager } from './editorBlockManager';
 
 const initialConfig = {
   namespace: 'StexEditor',
@@ -25,6 +28,9 @@ function EditorBridge() {
 }
 
 export function Editor() {
+  const historyState = useMemo(() => createEmptyHistoryState(), []);
+  const blockManager = useMemo(() => createEditorBlockManager(), []);
+
   return (
     <div className="editor-container">
       <LexicalComposer initialConfig={initialConfig}>
@@ -32,9 +38,10 @@ export function Editor() {
           contentEditable={<ContentEditable className="editor-input" />}
           ErrorBoundary={LexicalErrorBoundary}
         />
-        <HistoryPlugin />
+        <HistoryPlugin externalHistoryState={historyState} />
         <AutoFocusPlugin />
         <EditorBridge />
+        <TokenCommitPlugin blockManager={blockManager} historyState={historyState} />
       </LexicalComposer>
     </div>
   );

@@ -9,6 +9,7 @@ interface OverlayContextValue {
   togglePauseResume: () => void;
   copyText: () => void;
   registerEditor: (editor: LexicalEditor) => void;
+  registerClearHook: (hook: () => void) => () => void;
 }
 
 const OverlayContext = createContext<OverlayContextValue | null>(null);
@@ -24,9 +25,15 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
   const [pauseRequested, setPauseRequested] = useState(false);
   const editorRef = useRef<LexicalEditor | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearHooksRef = useRef<Set<() => void>>(new Set());
 
   const registerEditor = useCallback((editor: LexicalEditor) => {
     editorRef.current = editor;
+  }, []);
+
+  const registerClearHook = useCallback((hook: () => void): (() => void) => {
+    clearHooksRef.current.add(hook);
+    return () => { clearHooksRef.current.delete(hook); };
   }, []);
 
   const clearEditor = useCallback(() => {
@@ -36,6 +43,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
         $getRoot().clear();
       });
     }
+    clearHooksRef.current.forEach((hook) => hook());
   }, []);
 
   const isEditorEmpty = useCallback(() => {
@@ -132,6 +140,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
         togglePauseResume,
         copyText,
         registerEditor,
+        registerClearHook,
       }}
     >
       {children}
