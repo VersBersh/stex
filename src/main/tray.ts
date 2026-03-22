@@ -1,6 +1,7 @@
 import { Tray, Menu, nativeImage, app } from 'electron';
 import * as path from 'path';
-import { toggleOverlay, showSettings } from './window';
+import { showSettings } from './window';
+import { requestToggle } from './session';
 
 let tray: Tray | null = null;
 
@@ -23,7 +24,7 @@ export function initTray(): void {
   tray.setToolTip('Stex');
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show/Hide', click: () => toggleOverlay() },
+    { label: 'Show/Hide', click: () => requestToggle() },
     { label: 'Settings', click: () => showSettings() },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },

@@ -85,9 +85,9 @@ vi.mock('./settings', () => ({
   },
 }));
 
-// --- Mock window ---
-vi.mock('./window', () => ({
-  toggleOverlay: (...args: unknown[]) => mockToggleOverlay(...args),
+// --- Mock session ---
+vi.mock('./session', () => ({
+  requestToggle: (...args: unknown[]) => mockToggleOverlay(...args),
 }));
 
 import { initHotkeyManager } from './hotkey';

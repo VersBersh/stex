@@ -80,8 +80,12 @@ vi.mock('electron', () => {
 
 // --- Mock window module ---
 vi.mock('./window', () => ({
-  toggleOverlay: (...args: unknown[]) => mockToggleOverlay(...args),
   showSettings: (...args: unknown[]) => mockShowSettings(...args),
+}));
+
+// --- Mock session module ---
+vi.mock('./session', () => ({
+  requestToggle: (...args: unknown[]) => mockToggleOverlay(...args),
 }));
 
 import { initTray, destroyTray } from './tray';

@@ -13,6 +13,12 @@ let moveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const DEBOUNCE_MS = 300;
 
+let closeRequestHandler: (() => void) | null = null;
+
+export function setOverlayCloseHandler(handler: () => void): void {
+  closeRequestHandler = handler;
+}
+
 export function getValidatedPosition(
   settings: AppSettings,
 ): { x: number; y: number } | undefined {
@@ -91,7 +97,11 @@ function createOverlayWindowInternal(): BrowserWindow {
   win.on('close', (e) => {
     if (!isAppQuitting) {
       e.preventDefault();
-      hideOverlay();
+      if (closeRequestHandler) {
+        closeRequestHandler();
+      } else {
+        hideOverlay();
+      }
     }
   });
 

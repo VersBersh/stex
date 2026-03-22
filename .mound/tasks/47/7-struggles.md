@@ -1,0 +1,1 @@
+No struggles. The conflict was a single file (`src/main/index.ts`) where the cherry-picked commit added `initSessionManager` in the same import block where main had added `initThemeManager`. Both imports were needed — resolved by keeping both.

@@ -5,12 +5,14 @@ import { initTray } from './tray';
 import { initHotkeyManager } from './hotkey';
 import { registerAudioIpc } from './audio';
 import { initThemeManager } from './theme';
+import { initSessionManager } from './session';
 
 app.whenReady().then(() => {
   registerSettingsIpc();
   registerAudioIpc();
   initThemeManager();
   initWindowManager();
+  initSessionManager();
   initTray();
   initHotkeyManager();
 });

@@ -1,6 +1,6 @@
 import { globalShortcut, Notification, app } from 'electron';
 import { getSettings, onSettingsChanged } from './settings';
-import { toggleOverlay } from './window';
+import { requestToggle } from './session';
 
 let currentAccelerator: string | null = null;
 let lastRequestedHotkey: string | null = null;
@@ -12,7 +12,7 @@ function registerHotkey(accelerator: string): boolean {
 
   try {
     const success = globalShortcut.register(accelerator, () => {
-      toggleOverlay();
+      requestToggle();
     });
 
     if (success) {
