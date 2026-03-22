@@ -1,0 +1,12 @@
+**Verdict** — `Needs Fixes`
+
+**Progress**
+- `Partially done` Step 1: [`error-classification.ts`](/C:/code/draftable/stex/.mound/worktrees/worker-7-0c477b4c/src/main/error-classification.ts#L1) exists and the extracted logic matches the original `session.ts`, but it is untracked and not part of `git diff HEAD`.
+- `Partially done` Step 2: [`reconnect-policy.ts`](/C:/code/draftable/stex/.mound/worktrees/worker-7-0c477b4c/src/main/reconnect-policy.ts#L1) exists and `getReconnectDelay()` preserves the old formula, but it is untracked and not part of `git diff HEAD`.
+- `Done` Step 3: [`session.ts`](/C:/code/draftable/stex/.mound/worktrees/worker-7-0c477b4c/src/main/session.ts#L8) was updated exactly as planned: imports added, inlined classifiers removed, reconnect constants removed, and `scheduleReconnect()` now calls `getReconnectDelay()`.
+- `Partially done` Step 4: [`error-classification.test.ts`](/C:/code/draftable/stex/.mound/worktrees/worker-7-0c477b4c/src/main/error-classification.test.ts#L1) and [`reconnect-policy.test.ts`](/C:/code/draftable/stex/.mound/worktrees/worker-7-0c477b4c/src/main/reconnect-policy.test.ts#L1) exist and cover the planned branches, but both files are untracked and not part of `git diff HEAD`.
+
+**Issues**
+1. `Major` The patch is incomplete as submitted: [`session.ts`](/C:/code/draftable/stex/.mound/worktrees/worker-7-0c477b4c/src/main/session.ts#L8) now imports `./error-classification` and `./reconnect-policy` at lines 8-9, but the new source and test files are not included in `git diff HEAD`. The implementation files themselves are present at [`error-classification.ts`](/C:/code/draftable/stex/.mound/worktrees/worker-7-0c477b4c/src/main/error-classification.ts#L1), [`reconnect-policy.ts`](/C:/code/draftable/stex/.mound/worktrees/worker-7-0c477b4c/src/main/reconnect-policy.ts#L1), [`error-classification.test.ts`](/C:/code/draftable/stex/.mound/worktrees/worker-7-0c477b4c/src/main/error-classification.test.ts#L1), and [`reconnect-policy.test.ts`](/C:/code/draftable/stex/.mound/worktrees/worker-7-0c477b4c/src/main/reconnect-policy.test.ts#L1), but because they are untracked, the reviewed change set would break module resolution and omit the planned tests if landed as-is. Fix: add those four files to the change set and re-review the full diff.
+
+Other than that, the refactor itself looks behavior-preserving: the extracted functions are verbatim, `scheduleReconnect()` keeps the same backoff semantics, and callers/dependents remain unchanged.

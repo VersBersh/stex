@@ -6,13 +6,11 @@ import { getSettings } from './settings';
 import { flashTrayIcon } from './tray';
 import { IpcChannels } from '../shared/ipc';
 import type { SessionState, SonioxToken, ErrorInfo } from '../shared/types';
+import { classifyAudioError, classifyDisconnect } from './error-classification';
+import { getReconnectDelay } from './reconnect-policy';
 
 const FINALIZATION_TIMEOUT_MS = 5000;
 const CLIPBOARD_TIMEOUT_MS = 2000;
-const RECONNECT_INITIAL_MS = 1000;
-const RECONNECT_MAX_MS = 30000;
-const RECONNECT_MULTIPLIER = 2;
-
 let status: SessionState['status'] = 'idle';
 let soniox: SonioxClient | null = null;
 let activeTransition: Promise<void> | null = null;
@@ -94,58 +92,6 @@ function onAudioData(chunk: Buffer): void {
   soniox?.sendAudio(chunk);
 }
 
-function classifyAudioError(err: Error): ErrorInfo {
-  const msg = err.message.toLowerCase();
-  if (msg.includes('access denied') || msg.includes('permission') || msg.includes('microphone access denied')) {
-    return {
-      type: 'mic-denied',
-      message: 'Microphone access denied',
-      action: { label: 'Grant access in Windows Settings', action: 'open-mic-settings' },
-    };
-  }
-  if (msg.includes('device not found') || msg.includes('unavailable')) {
-    return {
-      type: 'mic-unavailable',
-      message: 'Audio device unavailable',
-    };
-  }
-  return { type: 'unknown', message: err.message };
-}
-
-function classifyDisconnect(code: number, reason: string): { reconnectable: boolean; error: ErrorInfo } {
-  const reasonLower = reason.toLowerCase();
-
-  if (reasonLower.includes('api key') || reasonLower.includes('unauthorized') || reasonLower.includes('authentication')) {
-    return {
-      reconnectable: false,
-      error: {
-        type: 'api-key',
-        message: 'Invalid API key',
-        action: { label: 'Open Settings', action: 'open-settings' },
-      },
-    };
-  }
-
-  if (reasonLower.includes('rate limit') || reasonLower.includes('quota') || reasonLower.includes('too many')) {
-    return {
-      reconnectable: false,
-      error: {
-        type: 'rate-limit',
-        message: 'Rate limit exceeded',
-      },
-    };
-  }
-
-  // Default: network issue, reconnectable
-  return {
-    reconnectable: true,
-    error: {
-      type: 'network',
-      message: 'Connection lost',
-    },
-  };
-}
-
 function onAudioError(err: Error): void {
   console.error('Audio capture error:', err.message);
   stopCapture();
@@ -171,10 +117,7 @@ function scheduleReconnect(): void {
   // Guard: don't schedule if a timer is already pending
   if (reconnectTimer) return;
 
-  const delay = Math.min(
-    RECONNECT_INITIAL_MS * Math.pow(RECONNECT_MULTIPLIER, reconnectAttempt),
-    RECONNECT_MAX_MS,
-  );
+  const delay = getReconnectDelay(reconnectAttempt);
   reconnectAttempt++;
 
   status = 'reconnecting';
