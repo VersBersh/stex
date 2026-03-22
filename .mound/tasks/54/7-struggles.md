@@ -1,0 +1,1 @@
+No struggles. The conflict was a simple additive collision in OverlayContext.tsx — task 13 added `clearHooksRef` and task 45 added `controllerRef` at the same insertion point. Both refs were needed, so the resolution was to keep both lines.

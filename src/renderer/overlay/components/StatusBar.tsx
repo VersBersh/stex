@@ -1,7 +1,7 @@
 import { useOverlay } from '../OverlayContext';
 
 export function StatusBar() {
-  const { confirmingClear, pauseRequested, requestClear, togglePauseResume, copyText } =
+  const { confirmingClear, paused, requestClear, togglePauseResume, copyText } =
     useOverlay();
 
   return (
@@ -12,7 +12,7 @@ export function StatusBar() {
       </div>
       <div className="status-bar-right">
         <button onClick={togglePauseResume}>
-          {pauseRequested ? 'Resume' : 'Pause'}
+          {paused ? 'Resume' : 'Pause'}
         </button>
         <button
           onClick={requestClear}

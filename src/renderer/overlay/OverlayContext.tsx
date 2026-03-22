@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
+import { createPauseController } from './pauseController';
 
 interface OverlayContextValue {
   confirmingClear: boolean;
-  pauseRequested: boolean;
+  paused: boolean;
   requestClear: () => void;
   togglePauseResume: () => void;
   copyText: () => void;
@@ -22,10 +23,11 @@ export function useOverlay(): OverlayContextValue {
 
 export function OverlayProvider({ children }: { children: ReactNode }) {
   const [confirmingClear, setConfirmingClear] = useState(false);
-  const [pauseRequested, setPauseRequested] = useState(false);
+  const [paused, setPaused] = useState(false);
   const editorRef = useRef<LexicalEditor | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearHooksRef = useRef<Set<() => void>>(new Set());
+  const controllerRef = useRef<ReturnType<typeof createPauseController> | null>(null);
 
   const registerEditor = useCallback((editor: LexicalEditor) => {
     editorRef.current = editor;
@@ -78,14 +80,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
   }, [confirmingClear, clearEditor, isEditorEmpty]);
 
   const togglePauseResume = useCallback(() => {
-    setPauseRequested((prev) => {
-      if (prev) {
-        window.electronAPI.requestResume();
-      } else {
-        window.electronAPI.requestPause();
-      }
-      return !prev;
-    });
+    controllerRef.current?.toggle();
   }, []);
 
   const copyText = useCallback(() => {
@@ -102,6 +97,17 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
       if (clearTimerRef.current) {
         clearTimeout(clearTimerRef.current);
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = createPauseController(window.api);
+    controllerRef.current = controller;
+    const unsub = controller.subscribe(setPaused);
+    return () => {
+      unsub();
+      controller.destroy();
+      controllerRef.current = null;
     };
   }, []);
 
@@ -135,7 +141,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     <OverlayContext.Provider
       value={{
         confirmingClear,
-        pauseRequested,
+        paused,
         requestClear,
         togglePauseResume,
         copyText,
