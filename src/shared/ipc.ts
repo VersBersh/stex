@@ -9,5 +9,7 @@ export const IpcChannels = {
   SESSION_TEXT: 'session:text',
   SESSION_REQUEST_PAUSE: 'session:request-pause',
   SESSION_REQUEST_RESUME: 'session:request-resume',
+  SETTINGS_GET: 'settings:get',
+  SETTINGS_SET: 'settings:set',
   SETTINGS_UPDATED: 'settings:updated',
 } as const;

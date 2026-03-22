@@ -25,6 +25,7 @@ module.exports = {
   },
   externals: {
     electron: 'commonjs electron',
+    'electron-store': 'commonjs electron-store',
   },
   node: {
     __dirname: false,
