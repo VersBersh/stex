@@ -51,14 +51,14 @@ function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
 
 function makeResponse(
   tokens: Array<{ text: string; start_ms: number; end_ms: number; confidence: number; is_final: boolean }>,
-  audio_final_proc_ms: number,
-  audio_total_proc_ms: number,
+  final_audio_proc_ms: number,
+  total_audio_proc_ms: number,
   finished?: boolean,
 ) {
   return JSON.stringify({
     tokens,
-    audio_final_proc_ms,
-    audio_total_proc_ms,
+    final_audio_proc_ms,
+    total_audio_proc_ms,
     ...(finished !== undefined && { finished }),
   });
 }
@@ -94,7 +94,7 @@ describe('SonioxClient', () => {
     it('creates a WebSocket to the Soniox endpoint', async () => {
       client.connect(makeSettings());
       await vi.waitFor(() => expect(lastCreatedSocket()).not.toBeNull());
-      expect(lastCreatedSocket()!.url).toBe('wss://stt.soniox.com/transcribe');
+      expect(lastCreatedSocket()!.url).toBe('wss://stt-rt.soniox.com/transcribe-websocket');
     });
 
     it('sends configuration message on open', async () => {
@@ -113,7 +113,7 @@ describe('SonioxClient', () => {
       expect(configMsg).toEqual({
         api_key: 'my-api-key',
         model: 'stt-rt-preview',
-        audio_format: 'pcm_s16le',
+        audio_format: 's16le',
         sample_rate: 16000,
         num_channels: 1,
         language_hints: ['en'],
@@ -202,7 +202,7 @@ describe('SonioxClient', () => {
       ]);
     });
 
-    it('tracks audio_final_proc_ms to identify new final tokens', async () => {
+    it('tracks final_audio_proc_ms to identify new final tokens', async () => {
       client.connect(makeSettings());
       await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
 

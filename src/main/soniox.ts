@@ -1,12 +1,12 @@
 import WebSocket from 'ws';
 import { SonioxToken, AppSettings } from '../shared/types';
 
-const SONIOX_ENDPOINT = 'wss://stt.soniox.com/transcribe';
+const SONIOX_ENDPOINT = 'wss://stt-rt.soniox.com/transcribe-websocket';
 
 export interface SonioxResponse {
   tokens: SonioxToken[];
-  audio_final_proc_ms: number;
-  audio_total_proc_ms: number;
+  final_audio_proc_ms: number;
+  total_audio_proc_ms: number;
   finished?: boolean;
 }
 
@@ -46,7 +46,7 @@ export class SonioxClient {
       const config = {
         api_key: settings.sonioxApiKey,
         model: settings.sonioxModel,
-        audio_format: 'pcm_s16le',
+        audio_format: 's16le',
         sample_rate: 16000,
         num_channels: 1,
         language_hints: [settings.language],
@@ -107,7 +107,7 @@ export class SonioxClient {
 
     if (newFinalTokens.length > 0) {
       this.events.onFinalTokens?.(newFinalTokens);
-      this.lastFinalProcMs = response.audio_final_proc_ms;
+      this.lastFinalProcMs = response.final_audio_proc_ms;
     }
 
     if (nonFinalTokens.length > 0) {
