@@ -115,17 +115,19 @@ Session Manager (Main Process)
 
 | Direction | Channel | Payload | Purpose |
 |-----------|---------|---------|---------|
-| Main → Renderer | `session:start` | — | Signal session started (clear editor if fresh mode) |
+| Main → Renderer | `session:start` | `onShow: 'fresh' \| 'append'` | Signal session started. Renderer clears editor if onShow is 'fresh'. |
 | Main → Renderer | `session:stop` | — | Signal session ended |
 | Main → Renderer | `session:paused` | — | Signal recording paused |
 | Main → Renderer | `session:resumed` | — | Signal recording resumed |
 | Main → Renderer | `tokens:final` | `SonioxToken[]` | New finalized tokens to commit to editor |
 | Main → Renderer | `tokens:nonfinal` | `SonioxToken[]` | Current non-final tokens (replaces previous ghost text) |
 | Main → Renderer | `session:status` | `SessionState.status` | Status changes: `idle`, `connecting`, `recording`, `paused`, `finalizing`, `error`, `disconnected`, `reconnecting` |
-| Renderer → Main | `session:text` | `string` | Send final text for clipboard on hide |
+| Main → Renderer | `session:text` | — | Request editor text for clipboard copy |
+| Renderer → Main | `session:text` | `string` | Respond with editor text for clipboard copy |
 | Renderer → Main | `session:request-pause` | — | User clicked pause button |
 | Renderer → Main | `session:request-resume` | — | User clicked resume button |
-| Renderer → Main | `window:hide` | — | Request overlay dismiss — routes through Session Manager for finalization before hiding (title bar button or Escape key) |
+| Renderer → Main | `window:hide` | — | Request overlay dismiss — routes through Session Manager for finalization before hiding (title bar close button) |
+| Renderer → Main | `window:escape-hide` | — | Quick dismiss — stops session without finalization or clipboard, hides immediately (Escape key) |
 | Renderer → Main | `settings:get` | — | Request current settings |
 | Renderer → Main | `settings:set` | `key: string, value: unknown` | Update a single setting |
 | Main → Renderer | `settings:updated` | `AppSettings` | Push settings changes |

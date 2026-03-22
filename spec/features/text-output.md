@@ -20,7 +20,7 @@ After a transcription session, the corrected text needs to go somewhere useful â
 
 ### Manual Copy
 
-- Standard `Ctrl+C` works for copying selected text
+- `Ctrl+C` copies the current selection, or all text if nothing is selected
 - `Ctrl+A` selects all text in the editor (committed + any finalized ghost text)
 
 ### Clear on New Session

@@ -15,8 +15,8 @@ const api: ElectronAPI = {
   sendSessionText: (text: string) => ipcRenderer.send(IpcChannels.SESSION_TEXT, text),
 
   // Listen (Main → Renderer, push events)
-  onSessionStart: (callback: () => void) => {
-    const handler = () => callback();
+  onSessionStart: (callback: (onShow: 'fresh' | 'append') => void) => {
+    const handler = (_event: unknown, onShow: 'fresh' | 'append') => callback(onShow);
     ipcRenderer.on(IpcChannels.SESSION_START, handler);
     return () => { ipcRenderer.removeListener(IpcChannels.SESSION_START, handler); };
   },
@@ -49,6 +49,11 @@ const api: ElectronAPI = {
     const handler = (_event: unknown, status: SessionState['status']) => callback(status);
     ipcRenderer.on(IpcChannels.SESSION_STATUS, handler);
     return () => { ipcRenderer.removeListener(IpcChannels.SESSION_STATUS, handler); };
+  },
+  onRequestSessionText: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on(IpcChannels.SESSION_TEXT, handler);
+    return () => { ipcRenderer.removeListener(IpcChannels.SESSION_TEXT, handler); };
   },
   onSettingsUpdated: (callback: (settings: AppSettings) => void) => {
     const handler = (_event: unknown, settings: AppSettings) => callback(settings);

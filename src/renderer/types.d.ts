@@ -4,6 +4,7 @@ import type { ErrorInfo } from '../shared/types';
 
 interface ElectronAPI {
   hideWindow(): void;
+  escapeHide(): void;
   requestPause(): void;
   requestResume(): void;
   openSettings(): void;

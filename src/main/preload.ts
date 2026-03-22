@@ -3,6 +3,7 @@ import { IpcChannels } from '../shared/ipc';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   hideWindow: () => ipcRenderer.send(IpcChannels.WINDOW_HIDE),
+  escapeHide: () => ipcRenderer.send(IpcChannels.WINDOW_ESCAPE_HIDE),
   requestPause: () => ipcRenderer.send(IpcChannels.SESSION_REQUEST_PAUSE),
   requestResume: () => ipcRenderer.send(IpcChannels.SESSION_REQUEST_RESUME),
   openSettings: () => ipcRenderer.send(IpcChannels.SESSION_OPEN_SETTINGS),

@@ -12,6 +12,7 @@ const {
   mockShowOverlay,
   mockHideOverlay,
   MockSonioxClient,
+  mockFlashTrayIcon,
 } = vi.hoisted(() => {
   const mockIpcMainHandlers = new Map<string, (...args: unknown[]) => void>();
 
@@ -58,6 +59,7 @@ const {
 
   const mockSettingsData = {
     onHide: 'clipboard' as string,
+    onShow: 'fresh' as string,
     sonioxApiKey: 'test-key',
     sonioxModel: 'stt-rt-preview',
     language: 'en',
@@ -66,6 +68,7 @@ const {
 
   const mockShowOverlay = vi.fn();
   const mockHideOverlay = vi.fn();
+  const mockFlashTrayIcon = vi.fn();
 
   return {
     mockIpcMainHandlers,
@@ -77,6 +80,7 @@ const {
     mockShowOverlay,
     mockHideOverlay,
     MockSonioxClient,
+    mockFlashTrayIcon,
   };
 });
 
@@ -122,7 +126,12 @@ vi.mock('./settings', () => ({
   getSettings: () => ({ ...mockSettingsData }),
 }));
 
-import { initSessionManager, requestToggle } from './session';
+// --- Mock tray ---
+vi.mock('./tray', () => ({
+  flashTrayIcon: (...args: unknown[]) => mockFlashTrayIcon(...args),
+}));
+
+import { initSessionManager, requestToggle, requestQuickDismiss } from './session';
 import { IpcChannels } from '../shared/ipc';
 
 // --- Helpers ---
@@ -162,6 +171,11 @@ function triggerResumeIpc() {
   handler?.();
 }
 
+function triggerEscapeHideIpc() {
+  const handler = mockIpcMainHandlers.get(IpcChannels.WINDOW_ESCAPE_HIDE);
+  handler?.();
+}
+
 describe('Session Manager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -172,6 +186,7 @@ describe('Session Manager', () => {
     mockSonioxInstance._events = {};
     mockSonioxInstance.connected = false;
     mockSettingsData.onHide = 'clipboard';
+    mockSettingsData.onShow = 'fresh';
     mockSettingsData.sonioxApiKey = 'test-key';
 
     initSessionManager();
@@ -193,12 +208,12 @@ describe('Session Manager', () => {
       expect(mockShowOverlay).toHaveBeenCalled();
     });
 
-    it('sends SESSION_START IPC on start', () => {
+    it('sends SESSION_START IPC with onShow value on start', () => {
       mockOverlayWindow.isVisible.mockReturnValue(false);
 
       requestToggle();
 
-      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(IpcChannels.SESSION_START);
+      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(IpcChannels.SESSION_START, 'fresh');
     });
 
     it('sends connecting status on start', () => {
@@ -695,6 +710,173 @@ describe('Session Manager', () => {
       requestToggle(); // should hide (status is idle)
 
       expect(mockHideOverlay).toHaveBeenCalled();
+    });
+  });
+
+  describe('requestQuickDismiss', () => {
+    beforeEach(() => {
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+      requestToggle();
+      triggerOnConnected();
+      mockOverlayWindow.webContents.send.mockClear();
+      mockAudio.stopCapture.mockClear();
+    });
+
+    it('stops capture and hides without finalization', () => {
+      requestQuickDismiss();
+
+      expect(mockAudio.stopCapture).toHaveBeenCalled();
+      expect(mockSonioxInstance.finalize).not.toHaveBeenCalled();
+      expect(mockSonioxInstance.disconnect).toHaveBeenCalled();
+      expect(mockHideOverlay).toHaveBeenCalled();
+    });
+
+    it('sends idle status', () => {
+      requestQuickDismiss();
+
+      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+        IpcChannels.SESSION_STATUS,
+        'idle',
+      );
+    });
+
+    it('clears ghost text', () => {
+      requestQuickDismiss();
+
+      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+        IpcChannels.TOKENS_NONFINAL,
+        [],
+      );
+    });
+
+    it('does not write to clipboard', () => {
+      requestQuickDismiss();
+
+      expect(mockClipboard.writeText).not.toHaveBeenCalled();
+      // SESSION_TEXT should not be sent to renderer
+      const sendCalls = mockOverlayWindow.webContents.send.mock.calls;
+      const sessionTextCalls = sendCalls.filter(
+        (call: unknown[]) => call[0] === IpcChannels.SESSION_TEXT,
+      );
+      expect(sessionTextCalls).toHaveLength(0);
+    });
+
+    it('is no-op during active transition', () => {
+      mockOverlayWindow.isVisible.mockReturnValue(true);
+      requestToggle(); // starts async stopSession, sets activeTransition
+      mockHideOverlay.mockClear();
+
+      requestQuickDismiss();
+
+      // hideOverlay should not be called by quickDismiss
+      expect(mockHideOverlay).not.toHaveBeenCalled();
+    });
+
+    it('hides even when status is idle', () => {
+      mockSettingsData.onHide = 'none';
+      mockOverlayWindow.isVisible.mockReturnValue(true);
+      // Stop the session first to get to idle
+      requestToggle();
+      triggerOnFinished();
+
+      // Wait for stop to complete and reset
+      return vi.waitFor(() => {
+        expect(mockHideOverlay).toHaveBeenCalled();
+      }).then(() => {
+        mockHideOverlay.mockClear();
+        requestQuickDismiss();
+        expect(mockHideOverlay).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('WINDOW_ESCAPE_HIDE IPC', () => {
+    it('registers handler for WINDOW_ESCAPE_HIDE', () => {
+      expect(mockIpcMainHandlers.has(IpcChannels.WINDOW_ESCAPE_HIDE)).toBe(true);
+    });
+
+    it('routes to quick dismiss path', () => {
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+      requestToggle();
+      triggerOnConnected();
+      mockAudio.stopCapture.mockClear();
+      mockHideOverlay.mockClear();
+
+      triggerEscapeHideIpc();
+
+      expect(mockAudio.stopCapture).toHaveBeenCalled();
+      expect(mockSonioxInstance.finalize).not.toHaveBeenCalled();
+      expect(mockHideOverlay).toHaveBeenCalled();
+    });
+  });
+
+  describe('tray flash on clipboard copy', () => {
+    beforeEach(() => {
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+      requestToggle();
+      triggerOnConnected();
+      mockOverlayWindow.webContents.send.mockClear();
+      mockOverlayWindow.isVisible.mockReturnValue(true);
+    });
+
+    it('calls flashTrayIcon on successful clipboard copy', async () => {
+      requestToggle(); // stop
+      triggerOnFinished();
+
+      // Wait for clipboard text handler to be registered
+      await vi.waitFor(() => {
+        expect(mockIpcMainHandlers.has(IpcChannels.SESSION_TEXT)).toBe(true);
+      });
+
+      // Simulate renderer sending text back
+      const textHandler = mockIpcMainHandlers.get(IpcChannels.SESSION_TEXT)!;
+      textHandler({}, 'hello world');
+
+      await vi.waitFor(() => {
+        expect(mockFlashTrayIcon).toHaveBeenCalled();
+      });
+    });
+
+    it('skips flashTrayIcon when editor is empty', async () => {
+      requestToggle(); // stop
+      triggerOnFinished();
+
+      await vi.waitFor(() => {
+        expect(mockIpcMainHandlers.has(IpcChannels.SESSION_TEXT)).toBe(true);
+      });
+
+      // Simulate renderer sending empty text
+      const textHandler = mockIpcMainHandlers.get(IpcChannels.SESSION_TEXT)!;
+      textHandler({}, '');
+
+      await vi.waitFor(() => {
+        expect(mockHideOverlay).toHaveBeenCalled();
+      });
+
+      expect(mockFlashTrayIcon).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('SESSION_START includes onShow value', () => {
+    it('sends onShow: fresh by default', () => {
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+      requestToggle();
+
+      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+        IpcChannels.SESSION_START,
+        'fresh',
+      );
+    });
+
+    it('sends onShow: append when configured', () => {
+      mockSettingsData.onShow = 'append';
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+      requestToggle();
+
+      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+        IpcChannels.SESSION_START,
+        'append',
+      );
     });
   });
 });

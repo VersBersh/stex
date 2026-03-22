@@ -153,5 +153,60 @@ describe('Preload bridge', () => {
       wrapper(fakeEvent, fakeData);
       expect(callback).toHaveBeenCalledWith(fakeData);
     });
+
+    it('onSessionStart forwards onShow parameter to callback', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      const callback = vi.fn();
+      api.onSessionStart(callback);
+      const wrapper = mockOn.mock.calls.find(
+        (call: unknown[]) => call[0] === 'session:start',
+      )![1] as (...args: unknown[]) => void;
+      wrapper({}, 'fresh');
+      expect(callback).toHaveBeenCalledWith('fresh');
+    });
+
+    it('onSessionStart forwards append value', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      const callback = vi.fn();
+      api.onSessionStart(callback);
+      const wrapper = mockOn.mock.calls.find(
+        (call: unknown[]) => call[0] === 'session:start',
+      )![1] as (...args: unknown[]) => void;
+      wrapper({}, 'append');
+      expect(callback).toHaveBeenCalledWith('append');
+    });
+  });
+
+  describe('onRequestSessionText', () => {
+    it('exposes onRequestSessionText', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      expect(typeof api.onRequestSessionText).toBe('function');
+    });
+
+    it('registers listener for session:text channel', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      const callback = vi.fn();
+      api.onRequestSessionText(callback);
+      expect(mockOn).toHaveBeenCalledWith('session:text', expect.any(Function));
+    });
+
+    it('unsubscribe removes listener', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      const callback = vi.fn();
+      const unsubscribe = api.onRequestSessionText(callback) as () => void;
+      unsubscribe();
+      expect(mockRemoveListener).toHaveBeenCalledWith('session:text', expect.any(Function));
+    });
+
+    it('invokes callback when session:text is received', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      const callback = vi.fn();
+      api.onRequestSessionText(callback);
+      const wrapper = mockOn.mock.calls.find(
+        (call: unknown[]) => call[0] === 'session:text',
+      )![1] as (...args: unknown[]) => void;
+      wrapper({});
+      expect(callback).toHaveBeenCalled();
+    });
   });
 });

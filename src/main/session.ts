@@ -3,6 +3,7 @@ import { SonioxClient } from './soniox';
 import { startCapture, stopCapture } from './audio';
 import { getOverlayWindow, showOverlay, hideOverlay, showSettings, setOverlayCloseHandler } from './window';
 import { getSettings } from './settings';
+import { flashTrayIcon } from './tray';
 import { IpcChannels } from '../shared/ipc';
 import type { SessionState, SonioxToken, ErrorInfo } from '../shared/types';
 
@@ -22,6 +23,7 @@ let resumeHandler: ((...args: unknown[]) => void) | null = null;
 let dismissErrorHandler: ((...args: unknown[]) => void) | null = null;
 let openSettingsHandler: ((...args: unknown[]) => void) | null = null;
 let openMicSettingsHandler: ((...args: unknown[]) => void) | null = null;
+let escapeHideHandler: ((...args: unknown[]) => void) | null = null;
 
 // Reconnection state
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -66,19 +68,21 @@ function waitForFinalization(timeoutMs = FINALIZATION_TIMEOUT_MS): Promise<void>
   });
 }
 
-function waitForClipboardText(): Promise<void> {
-  return new Promise<void>((resolve) => {
+function waitForClipboardText(): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
     const handler = (_event: unknown, text: string) => {
       clearTimeout(timer);
       if (text && text.length > 0) {
         clipboard.writeText(text);
+        resolve(true);
+      } else {
+        resolve(false);
       }
-      resolve();
     };
 
     const timer = setTimeout(() => {
       ipcMain.removeListener(IpcChannels.SESSION_TEXT, handler);
-      resolve();
+      resolve(false);
     }, CLIPBOARD_TIMEOUT_MS);
 
     ipcMain.once(IpcChannels.SESSION_TEXT, handler);
@@ -286,9 +290,9 @@ function startSession(): void {
 
   status = 'connecting';
   sendStatus();
-  sendToRenderer(IpcChannels.SESSION_START);
 
   const settings = getSettings();
+  sendToRenderer(IpcChannels.SESSION_START, settings.onShow);
   soniox = new SonioxClient(createSonioxEvents());
   soniox.connect(settings);
 }
@@ -348,7 +352,10 @@ async function stopSession(): Promise<void> {
 
   const settings = getSettings();
   if (settings.onHide === 'clipboard') {
-    await waitForClipboardText();
+    const copied = await waitForClipboardText();
+    if (copied) {
+      flashTrayIcon();
+    }
   }
 
   soniox?.disconnect();
@@ -391,6 +398,31 @@ export function requestToggle(): void {
   }
 }
 
+export function requestQuickDismiss(): void {
+  // Don't interrupt an in-progress finalization
+  if (activeTransition) return;
+
+  // Stop any active session without finalization
+  if (status !== 'idle') {
+    stopCapture();
+
+    // Clear ghost text
+    sendToRenderer(IpcChannels.TOKENS_NONFINAL, []);
+    sendToRenderer(IpcChannels.SESSION_STOP);
+
+    // Disconnect without waiting for finalization
+    soniox?.disconnect();
+    soniox = null;
+
+    cancelReconnect();
+
+    status = 'idle';
+    sendStatus();
+  }
+
+  hideOverlay();
+}
+
 function removeHandler(channel: string, handler: ((...args: unknown[]) => void) | null): void {
   if (handler) {
     ipcMain.removeListener(channel, handler);
@@ -414,6 +446,7 @@ export function initSessionManager(): void {
   removeHandler(IpcChannels.SESSION_DISMISS_ERROR, dismissErrorHandler);
   removeHandler(IpcChannels.SESSION_OPEN_SETTINGS, openSettingsHandler);
   removeHandler(IpcChannels.SESSION_OPEN_MIC_SETTINGS, openMicSettingsHandler);
+  removeHandler(IpcChannels.WINDOW_ESCAPE_HIDE, escapeHideHandler);
 
   pauseHandler = () => { pauseSession(); };
   resumeHandler = () => { resumeSession(); };
@@ -435,6 +468,9 @@ export function initSessionManager(): void {
   ipcMain.on(IpcChannels.SESSION_DISMISS_ERROR, dismissErrorHandler);
   ipcMain.on(IpcChannels.SESSION_OPEN_SETTINGS, openSettingsHandler);
   ipcMain.on(IpcChannels.SESSION_OPEN_MIC_SETTINGS, openMicSettingsHandler);
+
+  escapeHideHandler = () => { requestQuickDismiss(); };
+  ipcMain.on(IpcChannels.WINDOW_ESCAPE_HIDE, escapeHideHandler);
 
   if (!initialized) {
     setOverlayCloseHandler(() => {

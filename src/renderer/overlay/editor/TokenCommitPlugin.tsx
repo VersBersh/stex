@@ -34,6 +34,15 @@ export function TokenCommitPlugin({ blockManager, historyState }: TokenCommitPlu
     });
   }, [registerClearHook, blockManager, historyState]);
 
+  // Reset undo/redo history when editor is cleared (e.g. onShow: 'fresh')
+  useEffect(() => {
+    return registerClearHook(() => {
+      historyState.undoStack.length = 0;
+      historyState.redoStack.length = 0;
+      historyState.current = { editor, editorState: editor.getEditorState() };
+    });
+  }, [registerClearHook, historyState, editor]);
+
   useEffect(() => {
     const unsubscribe = window.api.onTokensFinal((tokens: SonioxToken[]) => {
       const text = tokens.map((t) => t.text).join('');

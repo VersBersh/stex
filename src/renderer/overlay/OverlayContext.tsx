@@ -51,7 +51,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     if (editor) {
       editor.update(() => {
         $getRoot().clear();
-      });
+      }, { discrete: true });
     }
     clearHooksRef.current.forEach((hook) => hook());
   }, []);
@@ -158,12 +158,38 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     return () => controller.destroy();
   }, [clearEditor]);
 
+  // Respond to main process text requests for clipboard copy
+  useEffect(() => {
+    return window.api.onRequestSessionText(() => {
+      const editor = editorRef.current;
+      if (!editor) {
+        window.api.sendSessionText('');
+        return;
+      }
+      editor.getEditorState().read(() => {
+        const text = $getRoot().getTextContent();
+        window.api.sendSessionText(text);
+      });
+    });
+  }, []);
+
+
   // Window-level keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        window.electronAPI.hideWindow();
+        window.electronAPI.escapeHide();
+        return;
+      }
+
+      if (e.ctrlKey && e.key === 'c') {
+        const selection = window.getSelection();
+        if (!selection || selection.isCollapsed) {
+          e.preventDefault();
+          copyText();
+        }
+        // If text is selected, let default browser Ctrl+C handle it
         return;
       }
 
@@ -182,7 +208,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [togglePauseResume, requestClear]);
+  }, [togglePauseResume, requestClear, copyText]);
 
   return (
     <OverlayContext.Provider

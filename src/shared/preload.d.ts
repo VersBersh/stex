@@ -11,7 +11,7 @@ export interface ElectronAPI {
   sendSessionText(text: string): void;
 
   // Listen (Main → Renderer, push events) — each returns an unsubscribe function
-  onSessionStart(callback: () => void): () => void;
+  onSessionStart(callback: (onShow: 'fresh' | 'append') => void): () => void;
   onSessionStop(callback: () => void): () => void;
   onSessionPaused(callback: () => void): () => void;
   onSessionResumed(callback: () => void): () => void;
@@ -19,6 +19,7 @@ export interface ElectronAPI {
   onTokensNonfinal(callback: (tokens: SonioxToken[]) => void): () => void;
   onSessionStatus(callback: (status: SessionState['status']) => void): () => void;
   onSettingsUpdated(callback: (settings: AppSettings) => void): () => void;
+  onRequestSessionText(callback: () => void): () => void;
 }
 
 export interface SettingsAPI {
