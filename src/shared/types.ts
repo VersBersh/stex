@@ -59,6 +59,8 @@ export interface AudioDevice {
   defaultSampleRate: number;
 }
 
+export type ResolvedTheme = "light" | "dark";
+
 export interface TranscriptionRecord {
   id: string;
   text: string;

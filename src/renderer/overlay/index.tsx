@@ -5,6 +5,17 @@ import { StatusBar } from './components/StatusBar';
 import { OverlayProvider } from './OverlayContext';
 import './overlay.css';
 
+function initTheme() {
+  window.electronAPI.getResolvedTheme().then((theme) => {
+    document.documentElement.setAttribute('data-theme', theme);
+  });
+  window.electronAPI.onThemeChanged((theme) => {
+    document.documentElement.setAttribute('data-theme', theme);
+  });
+}
+
+initTheme();
+
 function App() {
   return (
     <OverlayProvider>

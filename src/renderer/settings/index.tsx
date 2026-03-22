@@ -6,6 +6,17 @@ import { Hotkeys } from './pages/Hotkeys';
 import { General } from './pages/General';
 import './settings.css';
 
+function initTheme() {
+  window.settingsApi.getResolvedTheme().then((theme) => {
+    document.documentElement.setAttribute('data-theme', theme);
+  });
+  window.settingsApi.onThemeChanged((theme) => {
+    document.documentElement.setAttribute('data-theme', theme);
+  });
+}
+
+initTheme();
+
 type TabId = 'api-key' | 'hotkeys' | 'general';
 
 const TABS: { id: TabId; label: string }[] = [

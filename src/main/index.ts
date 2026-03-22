@@ -4,10 +4,12 @@ import { registerSettingsIpc } from './settings';
 import { initTray } from './tray';
 import { initHotkeyManager } from './hotkey';
 import { registerAudioIpc } from './audio';
+import { initThemeManager } from './theme';
 
 app.whenReady().then(() => {
   registerSettingsIpc();
   registerAudioIpc();
+  initThemeManager();
   initWindowManager();
   initTray();
   initHotkeyManager();
