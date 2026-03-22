@@ -1,0 +1,13 @@
+- **Verdict** — `Needs Fixes`  
+  The tracked implementation follows the plan structurally, and the untracked `src/main/soniox.test.ts` is aligned with the intended design, but there is a correctness bug in the core message parser that can break valid WebSocket responses.
+
+- **Progress**
+  - `[x]` Step 1 — done: added `ws` and `@types/ws` in [package.json](C:/code/draftable/stex/.mound/worktrees/worker-2-d30bdf82/package.json#L11) and updated [package-lock.json](C:/code/draftable/stex/.mound/worktrees/worker-2-d30bdf82/package-lock.json#L1)
+  - `[x]` Step 2 — done: added `ws` to webpack externals in [webpack.main.config.js](C:/code/draftable/stex/.mound/worktrees/worker-2-d30bdf82/webpack.main.config.js#L26)
+  - `[x]` Step 3 — done: defined and exported `SonioxResponse` and `SonioxClientEvents` in [src/main/soniox.ts](C:/code/draftable/stex/.mound/worktrees/worker-2-d30bdf82/src/main/soniox.ts#L6)
+  - `[ ]` Step 4 — partially done: `SonioxClient` lifecycle and token handling are implemented, but `handleMessage` does not safely decode all `ws` message payload shapes
+  - `[x]` Step 5 — done: `SonioxClient`, `SonioxResponse`, and `SonioxClientEvents` are exported from [src/main/soniox.ts](C:/code/draftable/stex/.mound/worktrees/worker-2-d30bdf82/src/main/soniox.ts#L13)
+
+- **Issues**
+  1. **Major** — `handleMessage` assumes every `ws` message can be parsed via `data.toString()`, which is not safe for all `WebSocket.Data` variants. In `ws`, message data may arrive as `Buffer`, `string`, `ArrayBuffer`, or `Buffer[]`; `ArrayBuffer.prototype.toString()` yields `"[object ArrayBuffer]"`, and `Buffer[]#toString()` does not produce valid JSON. That makes the client fail on otherwise valid server messages in the exact codepath this task is meant to implement. See [src/main/soniox.ts](C:/code/draftable/stex/.mound/worktrees/worker-2-d30bdf82/src/main/soniox.ts#L93). The added tests only exercise string payloads, so this regression is currently untested; see [src/main/soniox.test.ts](C:/code/draftable/stex/.mound/worktrees/worker-2-d30bdf82/src/main/soniox.test.ts#L52) and [src/main/soniox.test.ts](C:/code/draftable/stex/.mound/worktrees/worker-2-d30bdf82/src/main/soniox.test.ts#L178).  
+     Suggested fix: normalize `data` before `JSON.parse` by handling `string`, `Buffer`, `ArrayBuffer`, and `Buffer[]` explicitly, then add tests for at least `Buffer` and `ArrayBuffer` payloads.
