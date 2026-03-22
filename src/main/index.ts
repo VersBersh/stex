@@ -1,3 +1,4 @@
+import * as path from 'path';
 import { app } from 'electron';
 import { initWindowManager, showSettings } from './window';
 import { registerSettingsIpc, getSettings } from './settings';
@@ -6,8 +7,12 @@ import { initHotkeyManager } from './hotkey';
 import { registerAudioIpc } from './audio';
 import { initThemeManager } from './theme';
 import { initSessionManager } from './session';
+import { initLogger } from './logger';
 
 export function initApp(): void {
+  const logDir = path.join(app.getPath('userData'), 'logs');
+  initLogger({ logDir, level: app.isPackaged ? 'info' : 'debug' });
+
   registerSettingsIpc();
   registerAudioIpc();
   initThemeManager();

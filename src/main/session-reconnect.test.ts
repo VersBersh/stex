@@ -131,6 +131,8 @@ vi.mock('./settings', () => ({
   getSettings: () => ({ ...mockSettingsData }),
 }));
 
+vi.mock('./logger');
+
 import { initSessionManager, requestToggle } from './session';
 import { IpcChannels } from '../shared/ipc';
 

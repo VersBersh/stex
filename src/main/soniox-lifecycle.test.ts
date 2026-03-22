@@ -70,6 +70,8 @@ vi.mock('./reconnect-policy', () => ({
   getReconnectDelay: (attempt: number) => Math.min(1000 * Math.pow(2, attempt), 30000),
 }));
 
+vi.mock('./logger');
+
 import { connectSoniox, isConnected, finalizeSoniox, sendAudio, resumeCapture, cancelReconnect, resetLifecycle } from './soniox-lifecycle';
 
 function createMockCallbacks() {

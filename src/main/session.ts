@@ -8,6 +8,7 @@ import { registerSessionIpc } from './session-ipc';
 import { connectSoniox, finalizeSoniox, isConnected, resumeCapture, cancelReconnect, resetLifecycle } from './soniox-lifecycle';
 import { sendToRenderer, sendStatus, sendError, clearError } from './renderer-send';
 import { copyEditorTextToClipboard } from './session-clipboard';
+import { info, warn } from './logger';
 
 const FINALIZATION_TIMEOUT_MS = 5000;
 let status: SessionState['status'] = 'idle';
@@ -23,7 +24,7 @@ function waitForFinalization(timeoutMs = FINALIZATION_TIMEOUT_MS): Promise<void>
       if (!resolved) {
         resolved = true;
         currentFinalizationResolver = null;
-        console.warn('Finalization timed out after %dms, proceeding anyway', timeoutMs);
+        warn('Finalization timed out after %dms, proceeding anyway', timeoutMs);
         resolve();
       }
     }, timeoutMs);
@@ -33,6 +34,7 @@ function waitForFinalization(timeoutMs = FINALIZATION_TIMEOUT_MS): Promise<void>
         resolved = true;
         currentFinalizationResolver = null;
         clearTimeout(timer);
+        info('Finalization completed');
         resolve();
       }
     };
@@ -62,6 +64,7 @@ function createLifecycleCallbacks() {
 
 function startSession(): void {
   if (status !== 'idle') return;
+  info('Session starting');
 
   status = 'connecting';
   sendStatus(status);
@@ -73,6 +76,7 @@ function startSession(): void {
 
 async function pauseSession(): Promise<void> {
   if (status !== 'recording') return;
+  info('Session pausing');
 
   status = 'paused';
 
@@ -88,6 +92,7 @@ async function pauseSession(): Promise<void> {
 
 function resumeSession(): void {
   if (status !== 'paused') return;
+  info('Session resuming');
 
   try {
     resumeCapture();
@@ -103,6 +108,7 @@ function resumeSession(): void {
 
 async function stopSession(): Promise<void> {
   if (status === 'idle' || status === 'finalizing') return;
+  info('Session stopping');
 
   cancelReconnect();
 

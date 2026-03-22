@@ -131,6 +131,8 @@ vi.mock('./tray', () => ({
   flashTrayIcon: (...args: unknown[]) => mockFlashTrayIcon(...args),
 }));
 
+vi.mock('./logger');
+
 import { initSessionManager, requestToggle, requestQuickDismiss } from './session';
 import { IpcChannels } from '../shared/ipc';
 

@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import { SonioxToken, AppSettings } from '../shared/types';
+import { info, debug } from './logger';
 
 const SONIOX_ENDPOINT = 'wss://stt-rt.soniox.com/transcribe-websocket';
 
@@ -38,11 +39,13 @@ export class SonioxClient {
     }
 
     this.lastFinalProcMs = 0;
+    info('Soniox WebSocket connecting to %s', SONIOX_ENDPOINT);
     const socket = new WebSocket(SONIOX_ENDPOINT);
     this.ws = socket;
 
     socket.on('open', () => {
       if (socket !== this.ws) return;
+      debug('Soniox WebSocket connected');
       const config = {
         api_key: settings.sonioxApiKey,
         model: settings.sonioxModel,
@@ -63,6 +66,7 @@ export class SonioxClient {
 
     socket.on('close', (code: number, reason: Buffer) => {
       if (socket !== this.ws) return;
+      info('Soniox WebSocket closed (code=%d)', code);
       this.events.onDisconnected?.(code, reason.toString());
     });
 
@@ -83,6 +87,7 @@ export class SonioxClient {
   }
 
   disconnect(): void {
+    debug('Soniox WebSocket disconnect requested');
     if (this.ws) {
       this.ws.removeAllListeners();
       this.ws.close();

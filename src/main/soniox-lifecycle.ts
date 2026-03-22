@@ -4,6 +4,7 @@ import { getSettings } from './settings';
 import { classifyAudioError, classifyDisconnect } from './error-classification';
 import { getReconnectDelay } from './reconnect-policy';
 import type { SonioxToken, ErrorInfo, SessionState } from '../shared/types';
+import { debug, info, warn, error } from './logger';
 
 export interface SonioxLifecycleCallbacks {
   onFinalTokens: (tokens: SonioxToken[]) => void;
@@ -23,6 +24,7 @@ export function isConnected(): boolean {
 }
 
 export function finalizeSoniox(): void {
+  debug('Finalization sent');
   soniox?.finalize();
 }
 
@@ -39,6 +41,7 @@ export function cancelReconnect(): void {
 }
 
 export function resetLifecycle(): void {
+  debug('Lifecycle reset');
   cancelReconnect();
   soniox?.disconnect();
   soniox = null;
@@ -48,6 +51,7 @@ function scheduleReconnect(): void {
   if (reconnectTimer) return;
 
   const delay = getReconnectDelay(reconnectAttempt);
+  info('Scheduling reconnect attempt %d in %dms', reconnectAttempt, delay);
   reconnectAttempt++;
 
   activeCallbacks?.onStatusChange('reconnecting');
@@ -59,6 +63,7 @@ function scheduleReconnect(): void {
 }
 
 function handleDisconnect(code: number, reason: string): void {
+  warn('Soniox disconnected (code=%d, reason=%s)', code, reason);
   stopCapture();
 
   const { reconnectable, error } = classifyDisconnect(code, reason);
@@ -80,7 +85,7 @@ function onAudioData(chunk: Buffer): void {
 }
 
 function onAudioError(err: Error): void {
-  console.error('Audio capture error:', err.message);
+  error('Audio capture error: %s', err.message);
   stopCapture();
   const errorInfo = classifyAudioError(err);
   activeCallbacks?.onStatusChange('error');
@@ -91,7 +96,7 @@ export function resumeCapture(): void {
   try {
     startCapture(onAudioData, onAudioError);
   } catch (err) {
-    console.error('Failed to restart audio capture:', (err as Error).message);
+    error('Failed to restart audio capture: %s', (err as Error).message);
     const errorInfo = classifyAudioError(err as Error);
     activeCallbacks?.onStatusChange('error');
     activeCallbacks?.onError(errorInfo);
@@ -102,13 +107,15 @@ export function resumeCapture(): void {
 export function connectSoniox(callbacks: SonioxLifecycleCallbacks): void {
   activeCallbacks = callbacks;
   const settings = getSettings();
+  info('Connecting to Soniox');
 
   soniox = new SonioxClient({
     onConnected: () => {
+      info('Soniox connected, starting audio capture');
       try {
         startCapture(onAudioData, onAudioError);
       } catch (err) {
-        console.error('Failed to start audio capture:', (err as Error).message);
+        error('Failed to start audio capture: %s', (err as Error).message);
         const errorInfo = classifyAudioError(err as Error);
         soniox?.disconnect();
         soniox = null;
@@ -131,7 +138,7 @@ export function connectSoniox(callbacks: SonioxLifecycleCallbacks): void {
       handleDisconnect(code, reason);
     },
     onError: (err: Error) => {
-      console.error('Soniox error:', err.message);
+      error('Soniox error: %s', err.message);
       stopCapture();
       callbacks.onStatusChange('error');
       callbacks.onError({ type: 'unknown', message: err.message });
@@ -142,6 +149,7 @@ export function connectSoniox(callbacks: SonioxLifecycleCallbacks): void {
 }
 
 function attemptReconnect(): void {
+  info('Attempting reconnect');
   if (soniox) {
     soniox.disconnect();
     soniox = null;
@@ -171,7 +179,7 @@ function attemptReconnect(): void {
       handleDisconnect(code, reason);
     },
     onError: (err: Error) => {
-      console.error('Soniox error during reconnect:', err.message);
+      error('Soniox error during reconnect: %s', err.message);
       scheduleReconnect();
     },
   });

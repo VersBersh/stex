@@ -41,6 +41,8 @@ vi.mock('ws', () => ({
   default: MockWebSocket,
 }));
 
+vi.mock('./logger');
+
 import { SonioxClient } from './soniox';
 import type { AppSettings } from '../shared/types';
 import { APP_SETTINGS_DEFAULTS } from './settings';

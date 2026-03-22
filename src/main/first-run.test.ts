@@ -39,8 +39,12 @@ vi.mock('electron', () => ({
   app: {
     whenReady: () => Promise.resolve(),
     on: vi.fn(),
+    getPath: () => '/tmp/test-userData',
+    isPackaged: false,
   },
 }));
+
+vi.mock('./logger');
 
 // --- Mock settings ---
 vi.mock('./settings', () => ({

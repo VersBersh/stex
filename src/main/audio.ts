@@ -3,6 +3,7 @@ import portAudio, { IoStreamRead } from 'naudiodon';
 import { getSettings } from './settings';
 import type { AudioDevice } from '../shared/types';
 import { IpcChannels } from '../shared/ipc';
+import { info, debug } from './logger';
 
 let activeStream: IoStreamRead | null = null;
 
@@ -26,6 +27,7 @@ export function startCapture(
   }
 
   const { audioInputDevice } = getSettings();
+  info('Audio capture starting (device: %s)', audioInputDevice ?? 'default');
   let deviceId = -1;
 
   if (audioInputDevice !== null) {
@@ -63,6 +65,7 @@ export function startCapture(
 
   try {
     stream.start();
+    debug('Audio capture started');
   } catch (err) {
     activeStream = null;
     stream.quit();
@@ -74,6 +77,7 @@ export function stopCapture(): void {
   if (!activeStream) {
     return;
   }
+  debug('Audio capture stopped');
   const stream = activeStream;
   activeStream = null;
   stream.quit();

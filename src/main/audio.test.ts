@@ -66,6 +66,8 @@ vi.mock('./settings', () => ({
   getSettings: () => mockSettings,
 }));
 
+vi.mock('./logger');
+
 import { listDevices, startCapture, stopCapture, registerAudioIpc } from './audio';
 import { IpcChannels } from '../shared/ipc';
 
