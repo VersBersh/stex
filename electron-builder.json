@@ -1,0 +1,14 @@
+{
+  "appId": "com.draftable.stex",
+  "productName": "stex",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": "nsis"
+  }
+}
