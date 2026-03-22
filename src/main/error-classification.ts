@@ -18,7 +18,10 @@ export function classifyAudioError(err: Error): ErrorInfo {
   return { type: 'unknown', message: err.message };
 }
 
-export function classifyDisconnect(code: number, reason: string): { reconnectable: boolean; error: ErrorInfo } {
+function classifyByReason(
+  reason: string,
+  fallback: { reconnectable: boolean; error: ErrorInfo },
+): { reconnectable: boolean; error: ErrorInfo } {
   const reasonLower = reason.toLowerCase();
 
   if (reasonLower.includes('api key') || reasonLower.includes('unauthorized') || reasonLower.includes('authentication')) {
@@ -35,19 +38,31 @@ export function classifyDisconnect(code: number, reason: string): { reconnectabl
   if (reasonLower.includes('rate limit') || reasonLower.includes('quota') || reasonLower.includes('too many')) {
     return {
       reconnectable: false,
-      error: {
-        type: 'rate-limit',
-        message: 'Rate limit exceeded',
-      },
+      error: { type: 'rate-limit', message: 'Rate limit exceeded' },
     };
   }
 
-  // Default: network issue, reconnectable
-  return {
+  return fallback;
+}
+
+export function classifyDisconnect(code: number, reason: string): { reconnectable: boolean; error: ErrorInfo } {
+  // Tier 1: Standard WebSocket close codes (RFC 6455) with unambiguous semantics
+  switch (code) {
+    case 1000: // Normal closure — server-initiated (user-initiated bypasses this path)
+    case 1001: // Going away
+    case 1006: // Abnormal closure (network failure)
+    case 1011: // Internal server error
+      return { reconnectable: true, error: { type: 'network', message: 'Connection lost' } };
+    case 1008: // Policy violation — non-reconnectable; use reason to refine error type
+      return classifyByReason(reason, {
+        reconnectable: false,
+        error: { type: 'unknown', message: reason || 'Policy violation' },
+      });
+  }
+
+  // Tier 2: Application-defined codes (4000-4999) and other codes — use reason text
+  return classifyByReason(reason, {
     reconnectable: true,
-    error: {
-      type: 'network',
-      message: 'Connection lost',
-    },
-  };
+    error: { type: 'network', message: 'Connection lost' },
+  });
 }

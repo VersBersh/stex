@@ -39,67 +39,113 @@ describe('classifyAudioError', () => {
 });
 
 describe('classifyDisconnect', () => {
-  it('returns non-reconnectable api-key error for authentication failures', () => {
-    const result = classifyDisconnect(4001, 'invalid api key');
-    expect(result).toEqual({
-      reconnectable: false,
-      error: {
-        type: 'api-key',
-        message: 'Invalid API key',
-        action: { label: 'Open Settings', action: 'open-settings' },
-      },
+  describe('standard close codes (code-based classification)', () => {
+    it('returns reconnectable for 1000 (normal closure)', () => {
+      const result = classifyDisconnect(1000, '');
+      expect(result).toEqual({
+        reconnectable: true,
+        error: { type: 'network', message: 'Connection lost' },
+      });
+    });
+
+    it('returns reconnectable for 1001 (going away)', () => {
+      const result = classifyDisconnect(1001, 'server shutting down');
+      expect(result.reconnectable).toBe(true);
+      expect(result.error.type).toBe('network');
+    });
+
+    it('returns reconnectable for 1006 (abnormal closure)', () => {
+      const result = classifyDisconnect(1006, 'connection lost');
+      expect(result).toEqual({
+        reconnectable: true,
+        error: { type: 'network', message: 'Connection lost' },
+      });
+    });
+
+    it('returns reconnectable for 1011 (internal server error)', () => {
+      const result = classifyDisconnect(1011, 'internal error');
+      expect(result.reconnectable).toBe(true);
+      expect(result.error.type).toBe('network');
+    });
+
+    it('ignores reason text when standard code matches', () => {
+      // Even though reason says "api key", code 1006 takes precedence
+      const result = classifyDisconnect(1006, 'invalid api key');
+      expect(result.reconnectable).toBe(true);
+      expect(result.error.type).toBe('network');
     });
   });
 
-  it('detects unauthorized reason', () => {
-    const result = classifyDisconnect(4001, 'unauthorized');
-    expect(result.reconnectable).toBe(false);
-    expect(result.error.type).toBe('api-key');
-  });
-
-  it('detects authentication reason', () => {
-    const result = classifyDisconnect(4001, 'authentication failed');
-    expect(result.reconnectable).toBe(false);
-    expect(result.error.type).toBe('api-key');
-  });
-
-  it('returns non-reconnectable rate-limit error', () => {
-    const result = classifyDisconnect(4029, 'rate limit exceeded');
-    expect(result).toEqual({
-      reconnectable: false,
-      error: {
-        type: 'rate-limit',
-        message: 'Rate limit exceeded',
-      },
+  describe('reason-text fallback (application-defined and ambiguous codes)', () => {
+    it('returns non-reconnectable api-key error for auth reason', () => {
+      const result = classifyDisconnect(4001, 'invalid api key');
+      expect(result).toEqual({
+        reconnectable: false,
+        error: {
+          type: 'api-key',
+          message: 'Invalid API key',
+          action: { label: 'Open Settings', action: 'open-settings' },
+        },
+      });
     });
-  });
 
-  it('detects quota reason as rate-limit', () => {
-    const result = classifyDisconnect(4029, 'quota exceeded');
-    expect(result.reconnectable).toBe(false);
-    expect(result.error.type).toBe('rate-limit');
-  });
-
-  it('detects too many reason as rate-limit', () => {
-    const result = classifyDisconnect(4029, 'too many requests');
-    expect(result.reconnectable).toBe(false);
-    expect(result.error.type).toBe('rate-limit');
-  });
-
-  it('returns reconnectable network error for generic disconnect', () => {
-    const result = classifyDisconnect(1006, 'connection lost');
-    expect(result).toEqual({
-      reconnectable: true,
-      error: {
-        type: 'network',
-        message: 'Connection lost',
-      },
+    it('detects unauthorized reason', () => {
+      const result = classifyDisconnect(4001, 'unauthorized');
+      expect(result.reconnectable).toBe(false);
+      expect(result.error.type).toBe('api-key');
     });
-  });
 
-  it('returns reconnectable for empty reason', () => {
-    const result = classifyDisconnect(1006, '');
-    expect(result.reconnectable).toBe(true);
-    expect(result.error.type).toBe('network');
+    it('detects authentication reason', () => {
+      const result = classifyDisconnect(4001, 'authentication failed');
+      expect(result.reconnectable).toBe(false);
+      expect(result.error.type).toBe('api-key');
+    });
+
+    it('returns non-reconnectable rate-limit error', () => {
+      const result = classifyDisconnect(4029, 'rate limit exceeded');
+      expect(result).toEqual({
+        reconnectable: false,
+        error: { type: 'rate-limit', message: 'Rate limit exceeded' },
+      });
+    });
+
+    it('detects quota reason as rate-limit', () => {
+      const result = classifyDisconnect(4029, 'quota exceeded');
+      expect(result.reconnectable).toBe(false);
+      expect(result.error.type).toBe('rate-limit');
+    });
+
+    it('detects too many reason as rate-limit', () => {
+      const result = classifyDisconnect(4029, 'too many requests');
+      expect(result.reconnectable).toBe(false);
+      expect(result.error.type).toBe('rate-limit');
+    });
+
+    it('classifies 1008 with auth reason as api-key error', () => {
+      const result = classifyDisconnect(1008, 'unauthorized');
+      expect(result.reconnectable).toBe(false);
+      expect(result.error.type).toBe('api-key');
+    });
+
+    it('classifies 1008 with generic reason as non-reconnectable', () => {
+      const result = classifyDisconnect(1008, 'policy violation');
+      expect(result.reconnectable).toBe(false);
+      expect(result.error.type).toBe('unknown');
+      expect(result.error.message).toBe('policy violation');
+    });
+
+    it('returns reconnectable network error for generic disconnect', () => {
+      const result = classifyDisconnect(4000, 'something unexpected');
+      expect(result).toEqual({
+        reconnectable: true,
+        error: { type: 'network', message: 'Connection lost' },
+      });
+    });
+
+    it('returns reconnectable for empty reason', () => {
+      const result = classifyDisconnect(4000, '');
+      expect(result.reconnectable).toBe(true);
+      expect(result.error.type).toBe('network');
+    });
   });
 });
