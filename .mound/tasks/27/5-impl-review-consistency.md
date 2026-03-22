@@ -1,0 +1,7 @@
+- **Verdict** — `Approved with Notes`
+- **Progress**
+  - `[x] Done` Edit [`tsconfig.main.json:1`](C:/code/draftable/stex/.mound/worktrees/worker-4-6d347dfe/tsconfig.main.json#L1) to add the planned `exclude` array after `include`. The final file matches the plan exactly.
+  - `[ ] Not started` Verify with `npm run build` and `npm test` as required by [`3-plan.md:22`](C:/code/draftable/stex/.mound/worktrees/worker-4-6d347dfe/.mound/tasks/27/3-plan.md#L22).
+
+- **Issues**
+  1. **Minor** — The verification step in the plan is not evidenced. [`3-plan.md:22`](C:/code/draftable/stex/.mound/worktrees/worker-4-6d347dfe/.mound/tasks/27/3-plan.md#L22) explicitly requires running `npm run build` and `npm test`, and those scripts do exist in [`package.json:6`](C:/code/draftable/stex/.mound/worktrees/worker-4-6d347dfe/package.json#L6). But [`4-impl-notes.md:7`](C:/code/draftable/stex/.mound/worktrees/worker-4-6d347dfe/.mound/tasks/27/4-impl-notes.md#L7) says there were no deviations and does not record that either command was run. The config change itself looks correct and consistent with the surrounding setup: webpack main reads this tsconfig via [`webpack.main.config.js:18`](C:/code/draftable/stex/.mound/worktrees/worker-4-6d347dfe/webpack.main.config.js#L18), and Vitest test discovery remains independent via [`vitest.config.ts:4`](C:/code/draftable/stex/.mound/worktrees/worker-4-6d347dfe/vitest.config.ts#L4). Suggested fix: run the two planned commands and record the results in the implementation notes.

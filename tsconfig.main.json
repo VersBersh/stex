@@ -4,5 +4,6 @@
     "outDir": "dist/main",
     "types": ["node"]
   },
-  "include": ["src/main/**/*", "src/shared/**/*"]
+  "include": ["src/main/**/*", "src/shared/**/*"],
+  "exclude": ["**/*.test.ts", "**/*.spec.ts"]
 }

@@ -1,0 +1,11 @@
+**Verdict** — `Approved with Notes`
+
+Verified against the repository sources. The core change in [3-plan.md](C:\code\draftable\stex\.mound\worktrees\worker-4-6d347dfe\.mound\tasks\27\3-plan.md):5-22 is correct for this codebase: [tsconfig.main.json](C:\code\draftable\stex\.mound\worktrees\worker-4-6d347dfe\tsconfig.main.json):1-8 currently includes `src/main/**/*` and `src/shared/**/*`, [webpack.main.config.js](C:\code\draftable\stex\.mound\worktrees\worker-4-6d347dfe\webpack.main.config.js):17-22 points `ts-loader` at that tsconfig, and the current matching tests are the four `src/main/*.test.ts` files referenced in context. The “no spec updates” position also checks out; there is no repo spec surface governing tsconfig/build-config structure beyond the task artifacts themselves.
+
+**Plan Issues**
+1. Minor — Step 2 ([3-plan.md](C:\code\draftable\stex\.mound\worktrees\worker-4-6d347dfe\.mound\tasks\27\3-plan.md):22): `npm run build` is a noisy verification target for this change because [package.json](C:\code\draftable\stex\.mound\worktrees\worker-4-6d347dfe\package.json):7 builds both main and renderer. A renderer-side failure would not tell you whether the `tsconfig.main.json` exclusion worked. Suggested fix: make the primary verification `webpack --config webpack.main.config.js` or `tsc -p tsconfig.main.json --noEmit`, then optionally run the full `npm run build`.
+
+2. Minor — Risks section ([3-plan.md](C:\code\draftable\stex\.mound\worktrees\worker-4-6d347dfe\.mound\tasks\27\3-plan.md):24-26): “None” is slightly too absolute. The change is low-risk, but `npm test` only discovers `.test.ts` files today via [vitest.config.ts](C:\code\draftable\stex\.mound\worktrees\worker-4-6d347dfe\vitest.config.ts):3-6, so the new `**/*.spec.ts` exclusion is preventive rather than something the current test command exercises. Suggested fix: note that `.spec.ts` coverage is future-proofing, not currently validated by `npm test`.
+
+**Spec Update Issues**
+None. The statement in [2-spec-updates.md](C:\code\draftable\stex\.mound\worktrees\worker-4-6d347dfe\.mound\tasks\27\2-spec-updates.md):1-3 is consistent with the repository: this is a build-config change, and there is no separate spec file that needs to be updated for it.
