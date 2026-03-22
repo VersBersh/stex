@@ -9,7 +9,8 @@
   "scripts": {
     "build": "webpack --config webpack.main.config.js && webpack --config webpack.preload.config.js && webpack --config webpack.renderer.config.js",
     "start": "npm run build && electron .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@lexical/react": "^0.22.0",
