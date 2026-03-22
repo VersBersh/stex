@@ -13,6 +13,16 @@ Users can edit any part of the **committed** (finalized) text at any time — in
 - This positions the cursor at the most likely correction target — the most recently transcribed text
 - The user can click anywhere to reposition the cursor for editing; it stays where they put it until they return to the end
 
+### Cursor Tracking Behavior
+
+When new tokens are committed and appended at the document tail:
+- If the cursor is currently at the end of committed text (on or after the last character of the last text node), it advances with the new text — this is the default tracking behavior
+- If the cursor is anywhere else (mid-document), it stays in place — the token append does not move it
+
+The determination of "at end" is made at the moment tokens arrive, by checking whether the selection's anchor is on the last text node in the last paragraph and its offset equals the node's text length. This is a per-event check, not persistent state.
+
+When the user moves the cursor back to the end of committed text (e.g., Ctrl+End, clicking after the last character), subsequent token commits resume advancing the cursor.
+
 ### Editing Committed Text
 
 - User clicks or navigates to any position within committed (final) text
@@ -27,6 +37,13 @@ Users can edit any part of the **committed** (finalized) text at any time — in
 - Final tokens always append at the **document tail** — never at the cursor position, never mid-document
 - The user's cursor position and selection are preserved — incoming text does not shift their editing context
 - When the user finishes editing and moves the cursor back to the end, it resumes tracking new tokens
+
+#### Selection Preservation
+
+When new tokens are appended at the document tail while the user has a cursor or selection mid-document:
+- The cursor/selection position must remain unchanged — the same characters surround the cursor before and after the append
+- Since tokens are appended after the user's cursor position, the implementation must save the current selection before appending and restore it afterward if the cursor was not at the document tail
+- This is a hard requirement, not a guarantee from the editor framework — the token commit plugin is responsible for implementing save/restore
 
 ### Append Anchor Rule
 

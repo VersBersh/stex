@@ -132,6 +132,172 @@ describe('EditorBlockManager', () => {
     });
   });
 
+  describe('getDocumentLength', () => {
+    it('returns 0 for empty manager', () => {
+      expect(manager.getDocumentLength()).toBe(0);
+    });
+
+    it('returns correct total for multiple blocks', () => {
+      manager.commitFinalTokens([makeToken('Hello ')]);
+      manager.commitFinalTokens([makeToken('world')]);
+      expect(manager.getDocumentLength()).toBe(11);
+    });
+
+    it('returns correct total after clear', () => {
+      manager.commitFinalTokens([makeToken('Hello')]);
+      manager.clear();
+      expect(manager.getDocumentLength()).toBe(0);
+    });
+  });
+
+  describe('applyEdit — tail insertion', () => {
+    it('creates new user block after soniox block when editing at end', () => {
+      manager.commitFinalTokens([makeToken('Hello ')]);
+      const result = manager.applyEdit(6, 0, 'world');
+
+      expect(result).toBe('tail');
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks[1]).toMatchObject({
+        text: 'world',
+        source: 'user',
+        modified: false,
+      });
+    });
+
+    it('extends existing user block at tail', () => {
+      manager.commitFinalTokens([makeToken('Hello ')]);
+      manager.applyEdit(6, 0, 'wo');
+      manager.applyEdit(8, 0, 'rld');
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks[1].text).toBe('world');
+      expect(blocks[1].source).toBe('user');
+    });
+
+    it('creates user block on empty manager', () => {
+      const result = manager.applyEdit(0, 0, 'Hello');
+
+      expect(result).toBe('tail');
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toMatchObject({
+        text: 'Hello',
+        source: 'user',
+        modified: false,
+      });
+    });
+  });
+
+  describe('applyEdit — mid-document edit', () => {
+    it('marks soniox block as modified when edited', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+      const result = manager.applyEdit(5, 1, '-');
+
+      expect(result).toBe('mid');
+      const blocks = manager.getBlocks();
+      expect(blocks[0].source).toBe('soniox');
+      expect(blocks[0].modified).toBe(true);
+      expect(blocks[0].text).toBe('Hello-world');
+    });
+
+    it('keeps already-modified block as modified', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+      manager.applyEdit(5, 1, '-'); // first edit marks modified
+      manager.applyEdit(0, 5, 'Howdy');
+
+      const blocks = manager.getBlocks();
+      expect(blocks[0].modified).toBe(true);
+      expect(blocks[0].text).toBe('Howdy-world');
+    });
+
+    it('updates user block text without changing source', () => {
+      manager.commitFinalTokens([makeToken('Hello ')]);
+      manager.applyEdit(6, 0, 'world'); // tail insert creates user block
+      manager.applyEdit(6, 5, 'earth'); // mid edit within user block
+
+      const blocks = manager.getBlocks();
+      expect(blocks[1].source).toBe('user');
+      expect(blocks[1].text).toBe('earth');
+    });
+
+    it('handles insertion within a block (no removal)', () => {
+      manager.commitFinalTokens([makeToken('Hllo')]);
+      const result = manager.applyEdit(1, 0, 'e');
+
+      expect(result).toBe('mid');
+      expect(manager.getDocumentText()).toBe('Hello');
+    });
+
+    it('handles deletion within a block', () => {
+      manager.commitFinalTokens([makeToken('Helllo')]);
+      const result = manager.applyEdit(3, 1, '');
+
+      expect(result).toBe('mid');
+      expect(manager.getDocumentText()).toBe('Hello');
+    });
+  });
+
+  describe('applyEdit — cross-block edits', () => {
+    it('select+replace spanning two blocks modifies first and trims second', () => {
+      manager.commitFinalTokens([makeToken('Hello ')]);
+      manager.applyEdit(6, 0, 'beautiful '); // user block
+      manager.commitFinalTokens([makeToken('world')]); // new soniox block
+
+      // Replace "ful beauti" (spanning user block into ... wait let me think about offsets)
+      // blocks: [soniox: "Hello " (0-6)], [user: "beautiful " (6-16)], [soniox: "world" (16-21)]
+      // Select+replace "beautiful world" with "earth" — offset 6, remove 15, insert "earth"
+      manager.applyEdit(6, 15, 'earth');
+
+      const blocks = manager.getBlocks();
+      // User block gets replacement, soniox block fully consumed and removed
+      expect(manager.getDocumentText()).toBe('Hello earth');
+    });
+
+    it('deletion spanning a full block removes it', () => {
+      manager.commitFinalTokens([makeToken('Hello ')]);
+      manager.applyEdit(6, 0, 'X'); // user block: "X"
+      manager.commitFinalTokens([makeToken(' world')]); // soniox: " world"
+
+      // blocks: [soniox: "Hello " (0-6)], [user: "X" (6-7)], [soniox: " world" (7-13)]
+      // Delete "X" — offset 6, remove 1
+      manager.applyEdit(6, 1, '');
+
+      expect(manager.getDocumentText()).toBe('Hello  world');
+      const blocks = manager.getBlocks();
+      // Empty user block should be pruned, leaving two soniox blocks
+      expect(blocks).toHaveLength(2);
+      expect(blocks[0]).toMatchObject({ text: 'Hello ', source: 'soniox' });
+      expect(blocks[1]).toMatchObject({ text: ' world', source: 'soniox' });
+    });
+  });
+
+  describe('commitFinalTokens after modification', () => {
+    it('creates new soniox block when last block is modified', () => {
+      manager.commitFinalTokens([makeToken('Hello')]);
+      manager.applyEdit(0, 5, 'Howdy'); // marks modified
+
+      manager.commitFinalTokens([makeToken(' world')]);
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(2);
+      expect(blocks[0]).toMatchObject({ text: 'Howdy', source: 'soniox', modified: true });
+      expect(blocks[1]).toMatchObject({ text: ' world', source: 'soniox', modified: false });
+    });
+
+    it('creates new soniox block when last block is a user block', () => {
+      manager.commitFinalTokens([makeToken('Hello ')]);
+      manager.applyEdit(6, 0, 'typed'); // tail insert creates user block
+
+      manager.commitFinalTokens([makeToken(' more')]);
+
+      const blocks = manager.getBlocks();
+      expect(blocks).toHaveLength(3);
+      expect(blocks[2]).toMatchObject({ text: ' more', source: 'soniox', modified: false });
+    });
+  });
+
   describe('independent instances', () => {
     it('each manager has independent block state', () => {
       const manager2 = createEditorBlockManager();

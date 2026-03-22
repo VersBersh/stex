@@ -47,8 +47,12 @@ interface EditorBlock {
 
 1. **Provenance is preserved**: When a user edits a `soniox` block, `source` stays `"soniox"` but `modified` flips to `true`. This prevents any future overwrite by incoming tokens.
 2. **User typing creates new blocks**: When the user types new text (not editing existing text), a new block with `source: "user"` is created. See [inline-typing](features/inline-typing.md) for block boundary rules.
-3. **Incoming tokens create new blocks**: Each batch of finalized tokens from Soniox creates a new block with `source: "soniox"`, `modified: false`.
-4. **Block boundaries**: Blocks alternate by source. Consecutive tokens from Soniox are merged into the same block. When the user types after a soniox block, a new user block starts. When new tokens arrive after a user block, a new soniox block starts.
+3. **Incoming tokens extend or create blocks**: Each batch of finalized tokens from Soniox extends the last block if it is `source: "soniox"` and `modified: false`. Otherwise, a new block with `source: "soniox"`, `modified: false` is created.
+4. **Block alternation**: Blocks alternate by source at boundaries. When the user types after a soniox block, a new user block starts. When new tokens arrive after a user block or a modified soniox block, a new soniox block starts.
+5. **Detecting mid-document edits**: The block manager tracks cumulative character offsets for each block. When a user-initiated text change occurs (excluding programmatic `'historic'`-tagged updates), the block manager determines whether the edit is at the document tail or within existing text:
+   - **Tail insertion** (edit offset equals total document length): creates or extends a `source: "user"` block per the inline-typing block boundary rules
+   - **Mid-document edit** (edit offset < total document length): maps the offset to the affected block(s); if a block has `source: "soniox"` and `modified: false`, sets `modified: true`; updates block `text` to reflect the edit
+   - **Cross-block edits** (select+replace spanning multiple blocks): all affected blocks are marked `modified: true` and the replacement text is applied to the first affected block; fully consumed subsequent blocks are removed
 
 ### Mapping to Lexical
 
