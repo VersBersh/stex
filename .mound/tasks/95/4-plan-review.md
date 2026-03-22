@@ -1,0 +1,8 @@
+**Verdict** — `Approved with Notes`
+
+**Plan Issues**
+1. Minor — Step 1 in [3-plan.md](/C:/code/draftable/stex/.mound/worktrees/worker-1-fb34007d/.mound/tasks/95/3-plan.md#L13) is internally contradictory. It says to remove `$getRoot` from the `lexical` import, but [OverlayContext.tsx](/C:/code/draftable/stex/.mound/worktrees/worker-1-fb34007d/src/renderer/overlay/OverlayContext.tsx#L53) still uses `$getRoot().clear()`, and the same step later acknowledges that `$getRoot` must remain. Fix: rewrite Step 1 to say only “add `$getDocumentText` import; keep `$getRoot` for `.clear()`.”
+2. Minor — Step 6 in [3-plan.md](/C:/code/draftable/stex/.mound/worktrees/worker-1-fb34007d/.mound/tasks/95/3-plan.md#L70) should name the concrete verification commands from [package.json](/C:/code/draftable/stex/.mound/worktrees/worker-1-fb34007d/package.json#L9): `npm run build` and `npm test`. `npm run build` succeeds in this workspace, but `npm test` currently fails at Vitest startup with `spawn EPERM` before tests run, so the plan should note that test execution may require a non-restricted environment.
+
+**Spec Update Issues**
+None. The proposed “no spec updates” stance is correct: this change only swaps three internal call sites in [OverlayContext.tsx](/C:/code/draftable/stex/.mound/worktrees/worker-1-fb34007d/src/renderer/overlay/OverlayContext.tsx#L64) to use the existing helper in [lexicalTextContract.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-fb34007d/src/renderer/overlay/editor/lexicalTextContract.ts#L14), and it does not change the text contract already described in [spec/models.md](/C:/code/draftable/stex/.mound/worktrees/worker-1-fb34007d/spec/models.md#L61).

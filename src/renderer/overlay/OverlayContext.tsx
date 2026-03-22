@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useRef, useCallback, useEffect, type ReactNode } from 'react';
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
+import { $getDocumentText } from './editor/lexicalTextContract';
 import { createPauseController } from './pauseController';
 import type { ErrorInfo, SessionState } from '../../shared/types';
 import { createSessionLifecycleController } from './sessionLifecycleController';
@@ -61,7 +62,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     if (!editor) return true;
     let empty = true;
     editor.getEditorState().read(() => {
-      const text = $getRoot().getTextContent();
+      const text = $getDocumentText();
       empty = text.trim().length === 0;
     });
     return empty;
@@ -99,7 +100,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     const editor = editorRef.current;
     if (!editor) return;
     editor.getEditorState().read(() => {
-      const text = $getRoot().getTextContent();
+      const text = $getDocumentText();
       navigator.clipboard.writeText(text);
     });
   }, []);
@@ -167,7 +168,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
         return;
       }
       editor.getEditorState().read(() => {
-        const text = $getRoot().getTextContent();
+        const text = $getDocumentText();
         window.api.sendSessionText(text);
       });
     });
