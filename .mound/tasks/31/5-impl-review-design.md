@@ -1,0 +1,3 @@
+**Verdict** — `Approved`
+
+The documentation change is aligned with the implementation in [spec/models.md](/C:/code/draftable/stex/.mound/worktrees/worker-8-098bdc6f/spec/models.md#L89), [spec/architecture.md](/C:/code/draftable/stex/.mound/worktrees/worker-8-098bdc6f/spec/architecture.md#L73), and [src/main/settings.ts](/C:/code/draftable/stex/.mound/worktrees/worker-8-098bdc6f/src/main/settings.ts#L8). It makes the stored-vs-effective distinction explicit, documents the `sonioxApiKey` resolution rule accurately, and improves architectural readability without adding unnecessary abstraction or hidden coupling. No modified file exceeds 300 lines.

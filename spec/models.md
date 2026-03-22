@@ -86,7 +86,7 @@ interface SessionState {
 
 ## AppSettings
 
-Persisted user preferences.
+Persisted user preferences. This interface defines both the on-disk schema (what is stored in `settings.json`) and the shape returned by `getSettings()` at runtime. For most fields the stored and returned values are identical, but some fields undergo runtime resolution — see [Stored vs Effective Settings](#stored-vs-effective-settings) below.
 
 ```typescript
 interface AppSettings {
@@ -104,6 +104,16 @@ interface AppSettings {
   windowSize: { width: number; height: number };
 }
 ```
+
+### Stored vs Effective Settings
+
+`getSettings()` returns **effective** settings — the values consumers actually use at runtime. For most fields, the effective value is simply the stored value (with defaults applied by `electron-store` for any missing keys). The following fields have additional resolution:
+
+| Field | Resolution precedence |
+|-------|----------------------|
+| `sonioxApiKey` | Non-empty saved value > `SONIOX_API_KEY` environment variable > empty string |
+
+The resolved environment variable value is **never** persisted back to `settings.json`, so `getSettings()` may return a `sonioxApiKey` derived from the environment that does not appear on disk.
 
 ## TranscriptionRecord
 
