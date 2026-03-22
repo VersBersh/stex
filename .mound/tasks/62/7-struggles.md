@@ -1,0 +1,1 @@
+No struggles. The conflict was a simple import-section conflict in `OverlayContext.tsx` where the cherry-picked commit added the `sessionLifecycleController` import at the same location where main had added `ErrorInfo` and `SessionState` type imports. Both imports were needed and the resolution was straightforward.

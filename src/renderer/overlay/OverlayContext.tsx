@@ -3,6 +3,7 @@ import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
 import { createPauseController } from './pauseController';
 import type { ErrorInfo, SessionState } from '../../shared/types';
+import { createSessionLifecycleController } from './sessionLifecycleController';
 
 interface OverlayContextValue {
   confirmingClear: boolean;
@@ -151,6 +152,11 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
       controllerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    const controller = createSessionLifecycleController(window.api, clearEditor);
+    return () => controller.destroy();
+  }, [clearEditor]);
 
   // Window-level keyboard shortcuts
   useEffect(() => {

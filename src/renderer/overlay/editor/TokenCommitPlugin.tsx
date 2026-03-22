@@ -15,10 +15,15 @@ export function TokenCommitPlugin({ blockManager, historyState }: TokenCommitPlu
   const [editor] = useLexicalComposerContext();
   const { registerClearHook } = useOverlay();
 
-  // Keep block manager in sync when the editor is cleared
+  // Keep block manager and history in sync when the editor is cleared
   useEffect(() => {
-    return registerClearHook(() => blockManager.clear());
-  }, [registerClearHook, blockManager]);
+    return registerClearHook(() => {
+      blockManager.clear();
+      historyState.undoStack.length = 0;
+      historyState.redoStack.length = 0;
+      historyState.current = null;
+    });
+  }, [registerClearHook, blockManager, historyState]);
 
   useEffect(() => {
     const unsubscribe = window.api.onTokensFinal((tokens: SonioxToken[]) => {
