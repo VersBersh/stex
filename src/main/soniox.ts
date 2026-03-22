@@ -15,7 +15,7 @@ export interface SonioxClientEvents {
   onNonFinalTokens: (tokens: SonioxToken[]) => void;
   onFinished: () => void;
   onConnected: () => void;
-  onDisconnected: (reason: string) => void;
+  onDisconnected: (code: number, reason: string) => void;
   onError: (error: Error) => void;
 }
 
@@ -61,9 +61,9 @@ export class SonioxClient {
       this.handleMessage(data);
     });
 
-    socket.on('close', (_code: number, reason: Buffer) => {
+    socket.on('close', (code: number, reason: Buffer) => {
       if (socket !== this.ws) return;
-      this.events.onDisconnected?.(reason.toString());
+      this.events.onDisconnected?.(code, reason.toString());
     });
 
     socket.on('error', (err: Error) => {

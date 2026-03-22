@@ -94,6 +94,7 @@ vi.mock('electron', () => ({
     },
   },
   clipboard: mockClipboard,
+  shell: { openExternal: vi.fn() },
 }));
 
 // --- Mock SonioxClient ---
@@ -112,6 +113,7 @@ vi.mock('./window', () => ({
   getOverlayWindow: () => mockOverlayWindow,
   showOverlay: (...args: unknown[]) => mockShowOverlay(...args),
   hideOverlay: (...args: unknown[]) => mockHideOverlay(...args),
+  showSettings: vi.fn(),
   setOverlayCloseHandler: vi.fn(),
 }));
 
@@ -143,7 +145,7 @@ function triggerOnNonFinalTokens(tokens: unknown[]) {
 }
 
 function triggerOnDisconnected(reason: string) {
-  mockSonioxInstance._events.onDisconnected?.(reason);
+  mockSonioxInstance._events.onDisconnected?.(1006, reason);
 }
 
 function triggerOnError(err: Error) {
@@ -540,12 +542,12 @@ describe('Session Manager', () => {
       mockOverlayWindow.webContents.send.mockClear();
     });
 
-    it('transitions to error on WebSocket disconnect', () => {
+    it('transitions to reconnecting on WebSocket disconnect', () => {
       triggerOnDisconnected('connection lost');
 
       expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
         IpcChannels.SESSION_STATUS,
-        'error',
+        'reconnecting',
       );
     });
 

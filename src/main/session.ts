@@ -1,13 +1,16 @@
-import { ipcMain, clipboard } from 'electron';
+import { ipcMain, clipboard, shell } from 'electron';
 import { SonioxClient } from './soniox';
 import { startCapture, stopCapture } from './audio';
-import { getOverlayWindow, showOverlay, hideOverlay, setOverlayCloseHandler } from './window';
+import { getOverlayWindow, showOverlay, hideOverlay, showSettings, setOverlayCloseHandler } from './window';
 import { getSettings } from './settings';
 import { IpcChannels } from '../shared/ipc';
-import type { SessionState, SonioxToken } from '../shared/types';
+import type { SessionState, SonioxToken, ErrorInfo } from '../shared/types';
 
 const FINALIZATION_TIMEOUT_MS = 5000;
 const CLIPBOARD_TIMEOUT_MS = 2000;
+const RECONNECT_INITIAL_MS = 1000;
+const RECONNECT_MAX_MS = 30000;
+const RECONNECT_MULTIPLIER = 2;
 
 let status: SessionState['status'] = 'idle';
 let soniox: SonioxClient | null = null;
@@ -16,6 +19,13 @@ let currentFinalizationResolver: (() => void) | null = null;
 let initialized = false;
 let pauseHandler: ((...args: unknown[]) => void) | null = null;
 let resumeHandler: ((...args: unknown[]) => void) | null = null;
+let dismissErrorHandler: ((...args: unknown[]) => void) | null = null;
+let openSettingsHandler: ((...args: unknown[]) => void) | null = null;
+let openMicSettingsHandler: ((...args: unknown[]) => void) | null = null;
+
+// Reconnection state
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempt = 0;
 
 function sendToRenderer(channel: string, ...args: unknown[]): void {
   const win = getOverlayWindow();
@@ -26,6 +36,10 @@ function sendToRenderer(channel: string, ...args: unknown[]): void {
 
 function sendStatus(): void {
   sendToRenderer(IpcChannels.SESSION_STATUS, status);
+}
+
+function sendError(error: ErrorInfo): void {
+  sendToRenderer(IpcChannels.SESSION_ERROR, error);
 }
 
 function waitForFinalization(timeoutMs = FINALIZATION_TIMEOUT_MS): Promise<void> {
@@ -76,32 +90,170 @@ function onAudioData(chunk: Buffer): void {
   soniox?.sendAudio(chunk);
 }
 
+function classifyAudioError(err: Error): ErrorInfo {
+  const msg = err.message.toLowerCase();
+  if (msg.includes('access denied') || msg.includes('permission') || msg.includes('microphone access denied')) {
+    return {
+      type: 'mic-denied',
+      message: 'Microphone access denied',
+      action: { label: 'Grant access in Windows Settings', action: 'open-mic-settings' },
+    };
+  }
+  if (msg.includes('device not found') || msg.includes('unavailable')) {
+    return {
+      type: 'mic-unavailable',
+      message: 'Audio device unavailable',
+    };
+  }
+  return { type: 'unknown', message: err.message };
+}
+
+function classifyDisconnect(code: number, reason: string): { reconnectable: boolean; error: ErrorInfo } {
+  const reasonLower = reason.toLowerCase();
+
+  if (reasonLower.includes('api key') || reasonLower.includes('unauthorized') || reasonLower.includes('authentication')) {
+    return {
+      reconnectable: false,
+      error: {
+        type: 'api-key',
+        message: 'Invalid API key',
+        action: { label: 'Open Settings', action: 'open-settings' },
+      },
+    };
+  }
+
+  if (reasonLower.includes('rate limit') || reasonLower.includes('quota') || reasonLower.includes('too many')) {
+    return {
+      reconnectable: false,
+      error: {
+        type: 'rate-limit',
+        message: 'Rate limit exceeded',
+      },
+    };
+  }
+
+  // Default: network issue, reconnectable
+  return {
+    reconnectable: true,
+    error: {
+      type: 'network',
+      message: 'Connection lost',
+    },
+  };
+}
+
 function onAudioError(err: Error): void {
   console.error('Audio capture error:', err.message);
   stopCapture();
+  const errorInfo = classifyAudioError(err);
   status = 'error';
   sendStatus();
+  sendError(errorInfo);
 }
 
-function startSession(): void {
-  if (status !== 'idle') return;
+function cancelReconnect(): void {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  reconnectAttempt = 0;
+}
 
-  status = 'connecting';
+function clearError(): void {
+  sendError(null as unknown as ErrorInfo);
+}
+
+function scheduleReconnect(): void {
+  // Guard: don't schedule if a timer is already pending
+  if (reconnectTimer) return;
+
+  const delay = Math.min(
+    RECONNECT_INITIAL_MS * Math.pow(RECONNECT_MULTIPLIER, reconnectAttempt),
+    RECONNECT_MAX_MS,
+  );
+  reconnectAttempt++;
+
+  status = 'reconnecting';
   sendStatus();
-  sendToRenderer(IpcChannels.SESSION_START);
+
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    attemptReconnect();
+  }, delay);
+}
+
+function attemptReconnect(): void {
+  // Tear down any existing client before creating a new one
+  if (soniox) {
+    soniox.disconnect();
+    soniox = null;
+  }
 
   const settings = getSettings();
 
   soniox = new SonioxClient({
     onConnected: () => {
+      // Reconnected successfully — wait for user to resume
+      reconnectAttempt = 0;
+      status = 'paused';
+      sendStatus();
+      clearError();
+    },
+    onFinalTokens: (tokens: SonioxToken[]) => {
+      sendToRenderer(IpcChannels.TOKENS_FINAL, tokens);
+    },
+    onNonFinalTokens: (tokens: SonioxToken[]) => {
+      sendToRenderer(IpcChannels.TOKENS_NONFINAL, tokens);
+    },
+    onFinished: () => {
+      currentFinalizationResolver?.();
+    },
+    onDisconnected: (_code: number, _reason: string) => {
+      // Reconnect attempt failed — schedule another try
+      // Funnel through single path to prevent overlapping timers
+      scheduleReconnect();
+    },
+    onError: (err: Error) => {
+      console.error('Soniox error during reconnect:', err.message);
+      // Reconnect attempt failed — schedule another try
+      scheduleReconnect();
+    },
+  });
+
+  soniox.connect(settings);
+}
+
+function handleDisconnect(code: number, reason: string): void {
+  stopCapture();
+
+  const { reconnectable, error } = classifyDisconnect(code, reason);
+
+  if (reconnectable) {
+    sendError(error);
+    scheduleReconnect();
+  } else {
+    cancelReconnect();
+    soniox?.disconnect();
+    soniox = null;
+    status = 'error';
+    sendStatus();
+    sendError(error);
+  }
+}
+
+function createSonioxEvents() {
+  return {
+    onConnected: () => {
       try {
         startCapture(onAudioData, onAudioError);
       } catch (err) {
         console.error('Failed to start audio capture:', (err as Error).message);
+        const errorInfo = classifyAudioError(err as Error);
         soniox?.disconnect();
         soniox = null;
         status = 'error';
         sendStatus();
+        sendError(errorInfo);
         return;
       }
       status = 'recording';
@@ -116,19 +268,28 @@ function startSession(): void {
     onFinished: () => {
       currentFinalizationResolver?.();
     },
-    onDisconnected: (_reason: string) => {
-      stopCapture();
-      status = 'error';
-      sendStatus();
+    onDisconnected: (code: number, reason: string) => {
+      handleDisconnect(code, reason);
     },
     onError: (err: Error) => {
       console.error('Soniox error:', err.message);
       stopCapture();
       status = 'error';
       sendStatus();
+      sendError({ type: 'unknown', message: err.message });
     },
-  });
+  };
+}
 
+function startSession(): void {
+  if (status !== 'idle') return;
+
+  status = 'connecting';
+  sendStatus();
+  sendToRenderer(IpcChannels.SESSION_START);
+
+  const settings = getSettings();
+  soniox = new SonioxClient(createSonioxEvents());
   soniox.connect(settings);
 }
 
@@ -155,8 +316,10 @@ function resumeSession(): void {
     startCapture(onAudioData, onAudioError);
   } catch (err) {
     console.error('Failed to restart audio capture:', (err as Error).message);
+    const errorInfo = classifyAudioError(err as Error);
     status = 'error';
     sendStatus();
+    sendError(errorInfo);
     return;
   }
 
@@ -167,6 +330,8 @@ function resumeSession(): void {
 
 async function stopSession(): Promise<void> {
   if (status === 'idle' || status === 'finalizing') return;
+
+  cancelReconnect();
 
   status = 'finalizing';
   sendStatus();
@@ -215,6 +380,12 @@ export function requestToggle(): void {
   }
 }
 
+function removeHandler(channel: string, handler: ((...args: unknown[]) => void) | null): void {
+  if (handler) {
+    ipcMain.removeListener(channel, handler);
+  }
+}
+
 export function initSessionManager(): void {
   // Reset state for re-initialization (needed for tests)
   if (soniox) {
@@ -224,20 +395,35 @@ export function initSessionManager(): void {
   status = 'idle';
   activeTransition = null;
   currentFinalizationResolver = null;
+  cancelReconnect();
 
   // Remove old IPC listeners to prevent double-firing on re-init
-  if (pauseHandler) {
-    ipcMain.removeListener(IpcChannels.SESSION_REQUEST_PAUSE, pauseHandler);
-  }
-  if (resumeHandler) {
-    ipcMain.removeListener(IpcChannels.SESSION_REQUEST_RESUME, resumeHandler);
-  }
+  removeHandler(IpcChannels.SESSION_REQUEST_PAUSE, pauseHandler);
+  removeHandler(IpcChannels.SESSION_REQUEST_RESUME, resumeHandler);
+  removeHandler(IpcChannels.SESSION_DISMISS_ERROR, dismissErrorHandler);
+  removeHandler(IpcChannels.SESSION_OPEN_SETTINGS, openSettingsHandler);
+  removeHandler(IpcChannels.SESSION_OPEN_MIC_SETTINGS, openMicSettingsHandler);
 
   pauseHandler = () => { pauseSession(); };
   resumeHandler = () => { resumeSession(); };
+  dismissErrorHandler = () => {
+    if (status === 'error' || status === 'disconnected') {
+      cancelReconnect();
+      soniox?.disconnect();
+      soniox = null;
+      status = 'idle';
+      sendStatus();
+      clearError();
+    }
+  };
+  openSettingsHandler = () => { showSettings(); };
+  openMicSettingsHandler = () => { shell.openExternal('ms-settings:privacy-microphone'); };
 
   ipcMain.on(IpcChannels.SESSION_REQUEST_PAUSE, pauseHandler);
   ipcMain.on(IpcChannels.SESSION_REQUEST_RESUME, resumeHandler);
+  ipcMain.on(IpcChannels.SESSION_DISMISS_ERROR, dismissErrorHandler);
+  ipcMain.on(IpcChannels.SESSION_OPEN_SETTINGS, openSettingsHandler);
+  ipcMain.on(IpcChannels.SESSION_OPEN_MIC_SETTINGS, openMicSettingsHandler);
 
   if (!initialized) {
     setOverlayCloseHandler(() => {

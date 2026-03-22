@@ -2,15 +2,20 @@ import { createContext, useContext, useState, useRef, useCallback, useEffect, ty
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
 import { createPauseController } from './pauseController';
+import type { ErrorInfo, SessionState } from '../../shared/types';
 
 interface OverlayContextValue {
   confirmingClear: boolean;
   paused: boolean;
+  sessionStatus: SessionState['status'];
+  error: ErrorInfo | null;
   requestClear: () => void;
   togglePauseResume: () => void;
   copyText: () => void;
   registerEditor: (editor: LexicalEditor) => void;
   registerClearHook: (hook: () => void) => () => void;
+  dismissError: () => void;
+  handleErrorAction: () => void;
 }
 
 const OverlayContext = createContext<OverlayContextValue | null>(null);
@@ -24,6 +29,8 @@ export function useOverlay(): OverlayContextValue {
 export function OverlayProvider({ children }: { children: ReactNode }) {
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<SessionState['status']>('idle');
+  const [error, setError] = useState<ErrorInfo | null>(null);
   const editorRef = useRef<LexicalEditor | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearHooksRef = useRef<Set<() => void>>(new Set());
@@ -80,8 +87,12 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
   }, [confirmingClear, clearEditor, isEditorEmpty]);
 
   const togglePauseResume = useCallback(() => {
-    controllerRef.current?.toggle();
-  }, []);
+    // Only allow pause/resume in valid states
+    if (sessionStatus === 'recording' || sessionStatus === 'paused') {
+      controllerRef.current?.toggle();
+    }
+    // No-op in other states (disconnected, reconnecting, error, etc.)
+  }, [sessionStatus]);
 
   const copyText = useCallback(() => {
     const editor = editorRef.current;
@@ -89,6 +100,36 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     editor.getEditorState().read(() => {
       const text = $getRoot().getTextContent();
       navigator.clipboard.writeText(text);
+    });
+  }, []);
+
+  const dismissError = useCallback(() => {
+    window.electronAPI.dismissError();
+    setError(null);
+  }, []);
+
+  const handleErrorAction = useCallback(() => {
+    if (!error?.action) return;
+    const action = error.action.action;
+    if (action === 'open-settings') {
+      window.electronAPI.openSettings();
+    } else if (action === 'open-mic-settings') {
+      window.electronAPI.openMicSettings();
+    }
+  }, [error]);
+
+  // Subscribe to session status changes from main process
+  useEffect(() => {
+    return window.electronAPI.onSessionStatus((newStatus) => {
+      setSessionStatus(newStatus as SessionState['status']);
+    });
+  }, []);
+
+  // Subscribe to session error events from main process
+  // null signals error cleared (recovery)
+  useEffect(() => {
+    return window.electronAPI.onSessionError((errorInfo) => {
+      setError(errorInfo ?? null);
     });
   }, []);
 
@@ -142,11 +183,15 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
       value={{
         confirmingClear,
         paused,
+        sessionStatus,
+        error,
         requestClear,
         togglePauseResume,
         copyText,
         registerEditor,
         registerClearHook,
+        dismissError,
+        handleErrorAction,
       }}
     >
       {children}

@@ -13,6 +13,11 @@
   --btn-hover-text: #333;
   --confirm-color: #c00;
   --ghost-text-color: #999;
+  --error-bg: #fef2f2;
+  --error-border: #fca5a5;
+  --error-text: #991b1b;
+  --error-action-bg: #fee2e2;
+  --error-action-hover-bg: #fecaca;
 }
 
 [data-theme="dark"] {
@@ -30,6 +35,11 @@
   --btn-hover-text: #ddd;
   --confirm-color: #ff6b6b;
   --ghost-text-color: #666;
+  --error-bg: #451a1a;
+  --error-border: #7f1d1d;
+  --error-text: #fca5a5;
+  --error-action-bg: #5a2020;
+  --error-action-hover-bg: #6b2525;
 }
 
 html, body, #root {
@@ -161,4 +171,65 @@ html, body, #root {
 .status-bar-right button.confirming {
   color: var(--confirm-color);
   border-color: var(--confirm-color);
+}
+
+.status-bar-right button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Error Banner */
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--error-bg);
+  border-top: 1px solid var(--error-border);
+  flex-shrink: 0;
+}
+
+.error-banner-message {
+  font-size: 13px;
+  color: var(--error-text);
+}
+
+.error-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.error-banner-action {
+  padding: 2px 8px;
+  border: 1px solid var(--error-border);
+  border-radius: 3px;
+  background: var(--error-action-bg);
+  color: var(--error-text);
+  cursor: pointer;
+  font-size: 12px;
+  height: 24px;
+}
+
+.error-banner-action:hover {
+  background: var(--error-action-hover-bg);
+}
+
+.error-banner-dismiss {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--error-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+}
+
+.error-banner-dismiss:hover {
+  background: var(--error-action-bg);
 }

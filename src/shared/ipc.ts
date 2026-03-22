@@ -16,4 +16,8 @@ export const IpcChannels = {
   AUDIO_GET_DEVICES: 'audio:get-devices',
   THEME_GET: 'theme:get',
   THEME_RESOLVED: 'theme:resolved',
+  SESSION_ERROR: 'session:error',
+  SESSION_OPEN_SETTINGS: 'session:open-settings',
+  SESSION_OPEN_MIC_SETTINGS: 'session:open-mic-settings',
+  SESSION_DISMISS_ERROR: 'session:dismiss-error',
 } as const;

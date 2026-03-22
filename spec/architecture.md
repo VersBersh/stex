@@ -73,7 +73,7 @@
 | **Settings Store** | Reads/writes `settings.json` using `electron-store` or similar. Exposes settings to both renderers via IPC. `getSettings()` returns *effective* settings: for `sonioxApiKey`, the store applies resolution precedence (non-empty saved value > `SONIOX_API_KEY` env var > empty string) — the resolved value is never written back to disk |
 | **Audio Capture** | Opens the microphone via `naudiodon` (PortAudio bindings). Produces PCM s16le 16kHz mono chunks. Streams audio data directly to the Soniox Client. Uses the system default input device unless overridden in settings. If the selected device becomes unavailable (e.g. USB headset unplugged), stops capture and shows an error — user must resume manually after reconnecting the device. |
 | **Soniox Client** | Manages WebSocket connection to Soniox. Receives audio from Audio Capture, sends it as binary frames. Receives token responses, separates final/non-final, and forwards to renderer via IPC |
-| **Session Manager** | Orchestrates the lifecycle: on "start" → init audio + connect WebSocket; on "stop" → close audio + send empty frame for finalization + wait for response; on "pause" → stop mic capture, send empty frame, wait for finalization, keep WS alive; on "resume" → restart mic capture. Manages state transitions and notifies renderer |
+| **Session Manager** | Orchestrates the lifecycle: on "start" → init audio + connect WebSocket; on "stop" → close audio + send empty frame for finalization + wait for response; on "pause" → stop mic capture, send empty frame, wait for finalization, keep WS alive; on "resume" → restart mic capture. Manages state transitions and notifies renderer. On WebSocket disconnect, classifies the error and either auto-reconnects with exponential backoff (1s, 2s, 4s, max 30s) or surfaces a non-reconnectable error (API key, rate limit). After successful reconnect, waits for user to resume manually |
 
 ### Renderer Process (Overlay)
 
@@ -121,7 +121,7 @@ Session Manager (Main Process)
 | Main → Renderer | `session:resumed` | — | Signal recording resumed |
 | Main → Renderer | `tokens:final` | `SonioxToken[]` | New finalized tokens to commit to editor |
 | Main → Renderer | `tokens:nonfinal` | `SonioxToken[]` | Current non-final tokens (replaces previous ghost text) |
-| Main → Renderer | `session:status` | `SessionState.status` | Status changes (connecting, recording, error, etc.) |
+| Main → Renderer | `session:status` | `SessionState.status` | Status changes: `idle`, `connecting`, `recording`, `paused`, `finalizing`, `error`, `disconnected`, `reconnecting` |
 | Renderer → Main | `session:text` | `string` | Send final text for clipboard on hide |
 | Renderer → Main | `session:request-pause` | — | User clicked pause button |
 | Renderer → Main | `session:request-resume` | — | User clicked resume button |
@@ -129,6 +129,10 @@ Session Manager (Main Process)
 | Renderer → Main | `settings:get` | — | Request current settings |
 | Renderer → Main | `settings:set` | `key: string, value: unknown` | Update a single setting |
 | Main → Renderer | `settings:updated` | `AppSettings` | Push settings changes |
+| Main → Renderer | `session:error` | `ErrorInfo` | Push error details for error banner display |
+| Renderer → Main | `session:open-settings` | — | User clicked "Open Settings" action on error banner |
+| Renderer → Main | `session:open-mic-settings` | — | User clicked "Grant access in Windows Settings" action |
+| Renderer → Main | `session:dismiss-error` | — | User dismissed error banner |
 
 ## File Structure
 

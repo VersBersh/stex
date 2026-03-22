@@ -28,8 +28,14 @@ export interface GhostText {
   text: string;
 }
 
+export interface ErrorInfo {
+  type: 'api-key' | 'rate-limit' | 'mic-denied' | 'mic-unavailable' | 'network' | 'unknown';
+  message: string;
+  action?: { label: string; action: string };
+}
+
 export interface SessionState {
-  status: "idle" | "connecting" | "recording" | "paused" | "finalizing" | "error";
+  status: "idle" | "connecting" | "recording" | "paused" | "finalizing" | "error" | "disconnected" | "reconnecting";
   blocks: EditorBlock[];
   ghostText: GhostText | null;
   websocketConnected: boolean;

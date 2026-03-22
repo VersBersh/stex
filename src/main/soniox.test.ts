@@ -327,14 +327,15 @@ describe('SonioxClient', () => {
       expect(lastCreatedSocket()!.close).toHaveBeenCalled();
     });
 
-    it('emits onDisconnected on WebSocket close', async () => {
+    it('emits onDisconnected with code and reason on WebSocket close', async () => {
       client.connect(makeSettings());
       await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
 
       const socket = lastCreatedSocket()!;
-      socket.emit('close', 1000, 'Normal closure');
+      socket.emit('close', 1006, 'Connection lost');
 
       expect(events.onDisconnected).toHaveBeenCalledTimes(1);
+      expect(events.onDisconnected).toHaveBeenCalledWith(1006, 'Connection lost');
     });
 
     it('emits onError on WebSocket error', async () => {
