@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { $getRoot } from 'lexical';
+import { $getDocumentText } from './lexicalTextContract';
 import type { EditorBlockManager } from './editorBlockManager';
 
 interface UserTypingPluginProps {
@@ -15,7 +15,7 @@ export function UserTypingPlugin({ blockManager }: UserTypingPluginProps) {
       if (tags.has('historic')) return;
 
       editor.getEditorState().read(() => {
-        const fullText = $getRoot().getTextContent();
+        const fullText = $getDocumentText();
         const baseText = blockManager.getBaseText();
 
         if (!fullText.startsWith(baseText)) return;

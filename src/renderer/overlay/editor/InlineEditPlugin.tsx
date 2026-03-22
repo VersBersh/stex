@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { $getRoot } from 'lexical';
+import { $getDocumentText } from './lexicalTextContract';
 import type { EditorBlockManager } from './editorBlockManager';
 
 interface InlineEditPluginProps {
@@ -15,8 +15,8 @@ export function InlineEditPlugin({ blockManager }: InlineEditPluginProps) {
       // Skip programmatic updates (token commits use 'historic' tag)
       if (tags.has('historic')) return;
 
-      const currentText = editorState.read(() => $getRoot().getTextContent());
-      const prevText = prevEditorState.read(() => $getRoot().getTextContent());
+      const currentText = editorState.read(() => $getDocumentText());
+      const prevText = prevEditorState.read(() => $getDocumentText());
 
       if (currentText === prevText) return;
 

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { UNDO_COMMAND, REDO_COMMAND, COMMAND_PRIORITY_LOW, $getRoot } from 'lexical';
+import { UNDO_COMMAND, REDO_COMMAND, COMMAND_PRIORITY_LOW } from 'lexical';
+import { $getDocumentText } from './lexicalTextContract';
 import type { HistoryState } from '@lexical/history';
 import type { BlockHistory } from './editorBlockManager';
 
@@ -37,8 +38,8 @@ export function UndoRedoBlockSyncPlugin({
     return editor.registerUpdateListener(({ editorState, prevEditorState, tags }) => {
       if (tags.has('historic')) return;
 
-      const currentText = editorState.read(() => $getRoot().getTextContent());
-      const prevText = prevEditorState.read(() => $getRoot().getTextContent());
+      const currentText = editorState.read(() => $getDocumentText());
+      const prevText = prevEditorState.read(() => $getDocumentText());
       if (currentText === prevText) return;
 
       const undoStack = historyState.undoStack;
