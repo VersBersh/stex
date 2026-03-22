@@ -399,7 +399,7 @@ describe('Session Manager — Error Handling & Reconnection', () => {
       requestToggle();
       triggerOnConnected();
 
-      const errorCalls = getSendCalls(IpcChannels.SESSION_ERROR);
+      const errorCalls = getSendCalls(IpcChannels.SESSION_ERROR).filter(c => c[1] !== null);
       expect(errorCalls.length).toBeGreaterThan(0);
       expect(errorCalls[0][1]).toEqual(expect.objectContaining({
         type: 'mic-denied',
@@ -419,7 +419,7 @@ describe('Session Manager — Error Handling & Reconnection', () => {
       requestToggle();
       triggerOnConnected();
 
-      const errorCalls = getSendCalls(IpcChannels.SESSION_ERROR);
+      const errorCalls = getSendCalls(IpcChannels.SESSION_ERROR).filter(c => c[1] !== null);
       expect(errorCalls.length).toBeGreaterThan(0);
       expect(errorCalls[0][1]).toEqual(expect.objectContaining({
         type: 'mic-unavailable',

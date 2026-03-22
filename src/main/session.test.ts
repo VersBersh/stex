@@ -627,4 +627,74 @@ describe('Session Manager', () => {
       vi.useRealTimers();
     });
   });
+
+  describe('API key guard', () => {
+    it('shows overlay and sends no-api-key error when API key is empty', () => {
+      mockSettingsData.sonioxApiKey = '';
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+
+      requestToggle();
+
+      expect(mockShowOverlay).toHaveBeenCalled();
+      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+        IpcChannels.SESSION_ERROR,
+        expect.objectContaining({
+          type: 'no-api-key',
+          message: 'Set up your API key in Settings to start transcribing',
+        }),
+      );
+    });
+
+    it('does not start session when API key is empty', () => {
+      mockSettingsData.sonioxApiKey = '';
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+
+      requestToggle();
+
+      expect(mockSonioxInstance.connect).not.toHaveBeenCalled();
+      expect(mockAudio.startCapture).not.toHaveBeenCalled();
+    });
+
+    it('sends open-settings action in no-api-key error', () => {
+      mockSettingsData.sonioxApiKey = '';
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+
+      requestToggle();
+
+      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+        IpcChannels.SESSION_ERROR,
+        expect.objectContaining({
+          action: { label: 'Open Settings', action: 'open-settings' },
+        }),
+      );
+    });
+
+    it('clears error when starting session with valid API key', () => {
+      mockSettingsData.sonioxApiKey = 'test-key';
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+
+      requestToggle();
+
+      // clearError sends null via SESSION_ERROR before session start
+      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+        IpcChannels.SESSION_ERROR,
+        null,
+      );
+    });
+
+    it('hides overlay on second toggle when shown without API key', () => {
+      mockSettingsData.sonioxApiKey = '';
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+
+      requestToggle(); // shows overlay with error
+
+      // Now overlay is "visible"
+      mockOverlayWindow.isVisible.mockReturnValue(true);
+      mockHideOverlay.mockClear();
+
+      requestToggle(); // should hide (status is idle)
+
+      expect(mockHideOverlay).toHaveBeenCalled();
+    });
+  });
 });

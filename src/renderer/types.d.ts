@@ -12,7 +12,7 @@ interface ElectronAPI {
   getResolvedTheme(): Promise<"light" | "dark">;
   onThemeChanged(callback: (theme: "light" | "dark") => void): () => void;
   onSessionStatus(callback: (status: string) => void): () => void;
-  onSessionError(callback: (error: ErrorInfo) => void): () => void;
+  onSessionError(callback: (error: ErrorInfo | null) => void): () => void;
 }
 
 declare global {

@@ -38,7 +38,7 @@ function sendStatus(): void {
   sendToRenderer(IpcChannels.SESSION_STATUS, status);
 }
 
-function sendError(error: ErrorInfo): void {
+function sendError(error: ErrorInfo | null): void {
   sendToRenderer(IpcChannels.SESSION_ERROR, error);
 }
 
@@ -160,7 +160,7 @@ function cancelReconnect(): void {
 }
 
 function clearError(): void {
-  sendError(null as unknown as ErrorInfo);
+  sendError(null);
 }
 
 function scheduleReconnect(): void {
@@ -375,6 +375,17 @@ export function requestToggle(): void {
       hideOverlay();
     }
   } else {
+    const settings = getSettings();
+    if (!settings.sonioxApiKey) {
+      showOverlay();
+      sendError({
+        type: 'no-api-key',
+        message: 'Set up your API key in Settings to start transcribing',
+        action: { label: 'Open Settings', action: 'open-settings' },
+      });
+      return;
+    }
+    clearError();
     showOverlay();
     startSession();
   }

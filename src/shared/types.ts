@@ -29,7 +29,7 @@ export interface GhostText {
 }
 
 export interface ErrorInfo {
-  type: 'api-key' | 'rate-limit' | 'mic-denied' | 'mic-unavailable' | 'network' | 'unknown';
+  type: 'api-key' | 'rate-limit' | 'mic-denied' | 'mic-unavailable' | 'network' | 'no-api-key' | 'unknown';
   message: string;
   action?: { label: string; action: string };
 }
