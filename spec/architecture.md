@@ -125,7 +125,7 @@ Session Manager (Main Process)
 | Renderer → Main | `session:text` | `string` | Send final text for clipboard on hide |
 | Renderer → Main | `session:request-pause` | — | User clicked pause button |
 | Renderer → Main | `session:request-resume` | — | User clicked resume button |
-| Renderer → Main | `window:hide` | — | Hide the overlay window (title bar button or Escape key) |
+| Renderer → Main | `window:hide` | — | Request overlay dismiss — routes through Session Manager for finalization before hiding (title bar button or Escape key) |
 | Renderer → Main | `settings:get` | — | Request current settings |
 | Renderer → Main | `settings:set` | `key: string, value: unknown` | Update a single setting |
 | Main → Renderer | `settings:updated` | `AppSettings` | Push settings changes |

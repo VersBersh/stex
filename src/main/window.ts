@@ -16,8 +16,16 @@ const DEBOUNCE_MS = 300;
 
 let closeRequestHandler: (() => void) | null = null;
 
-export function setOverlayCloseHandler(handler: () => void): void {
+export function setOverlayCloseHandler(handler: (() => void) | null): void {
   closeRequestHandler = handler;
+}
+
+function requestOverlayDismiss(): void {
+  if (closeRequestHandler) {
+    closeRequestHandler();
+  } else {
+    hideOverlay();
+  }
 }
 
 export function getValidatedPosition(
@@ -100,11 +108,7 @@ function createOverlayWindowInternal(): BrowserWindow {
   win.on('close', (e) => {
     if (!isAppQuitting) {
       e.preventDefault();
-      if (closeRequestHandler) {
-        closeRequestHandler();
-      } else {
-        hideOverlay();
-      }
+      requestOverlayDismiss();
     }
   });
 
@@ -151,7 +155,9 @@ export function initWindowManager(): void {
 
   ipcMain.removeAllListeners(IpcChannels.WINDOW_HIDE);
   ipcMain.on(IpcChannels.WINDOW_HIDE, () => {
-    hideOverlay();
+    if (overlayWindow && !overlayWindow.isDestroyed() && overlayWindow.isVisible()) {
+      requestOverlayDismiss();
+    }
   });
 
   app.on('before-quit', () => {

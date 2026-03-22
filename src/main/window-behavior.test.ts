@@ -141,7 +141,9 @@ import {
   initWindowManager,
   showOverlay,
   getOverlayWindow,
+  setOverlayCloseHandler,
 } from './window';
+import { IpcChannels } from '../shared/ipc';
 
 describe('Window Behavior', () => {
   beforeEach(() => {
@@ -195,6 +197,51 @@ describe('Window Behavior', () => {
       const closeEvent = { preventDefault: vi.fn() };
       win.emit('close', closeEvent);
       expect(closeEvent.preventDefault).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('WINDOW_HIDE IPC routing', () => {
+    it('calls closeRequestHandler instead of hiding directly when handler is set', () => {
+      initWindowManager();
+      showOverlay();
+      const mockHandler = vi.fn();
+      setOverlayCloseHandler(mockHandler);
+
+      const handlers = mockIpcMainHandlers.get(IpcChannels.WINDOW_HIDE) ?? [];
+      for (const handler of handlers) {
+        handler();
+      }
+
+      expect(mockHandler).toHaveBeenCalledOnce();
+      // Window should still be visible — the handler is responsible for hiding
+      expect(getOverlayWindow()!.isVisible()).toBe(true);
+    });
+
+    it('falls back to hideOverlay when no handler is set', () => {
+      setOverlayCloseHandler(null);
+      initWindowManager();
+      showOverlay();
+
+      const handlers = mockIpcMainHandlers.get(IpcChannels.WINDOW_HIDE) ?? [];
+      for (const handler of handlers) {
+        handler();
+      }
+
+      expect(getOverlayWindow()!.isVisible()).toBe(false);
+    });
+
+    it('is a no-op when overlay is not visible', () => {
+      initWindowManager();
+      const mockHandler = vi.fn();
+      setOverlayCloseHandler(mockHandler);
+      // Overlay starts hidden — do not call showOverlay()
+
+      const handlers = mockIpcMainHandlers.get(IpcChannels.WINDOW_HIDE) ?? [];
+      for (const handler of handlers) {
+        handler();
+      }
+
+      expect(mockHandler).not.toHaveBeenCalled();
     });
   });
 });
