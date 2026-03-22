@@ -56,7 +56,7 @@ vi.mock('electron', () => {
     getOpacity() { return this._opacity; }
     setPosition(x: number, y: number) { this._bounds.x = x; this._bounds.y = y; }
     setSize(w: number, h: number) { this._bounds.width = w; this._bounds.height = h; }
-    center() { this._bounds.x = 660; this._bounds.y = 390; } // mock center on 1920x1080
+    center() { this._bounds.x = 660; this._bounds.y = 390; }
     setBounds(b: { x: number; y: number; width: number; height: number }) {
       if (b.x !== undefined) this._bounds.x = b.x;
       if (b.y !== undefined) this._bounds.y = b.y;
@@ -137,11 +137,10 @@ import {
   showOverlay,
   hideOverlay,
   toggleOverlay,
-  showSettings,
   getOverlayWindow,
 } from './window';
 
-describe('Window Manager', () => {
+describe('Window Visibility', () => {
   beforeEach(() => {
     mockWindowConstructorCalls.length = 0;
     mockDisplays.length = 0;
@@ -153,73 +152,6 @@ describe('Window Manager', () => {
     mockAppEventHandlers.clear();
     mockIpcMainHandlers.clear();
     Object.keys(mockSettingsData).forEach((k) => delete mockSettingsData[k]);
-  });
-
-  describe('initWindowManager', () => {
-    it('creates the overlay window hidden', () => {
-      initWindowManager();
-      expect(mockWindowConstructorCalls).toHaveLength(1);
-      expect(mockWindowConstructorCalls[0].show).toBe(false);
-    });
-
-    it('creates overlay as frameless', () => {
-      initWindowManager();
-      expect(mockWindowConstructorCalls[0].frame).toBe(false);
-    });
-
-    it('creates overlay as always-on-top', () => {
-      initWindowManager();
-      expect(mockWindowConstructorCalls[0].alwaysOnTop).toBe(true);
-    });
-
-    it('creates overlay with skip-taskbar', () => {
-      initWindowManager();
-      expect(mockWindowConstructorCalls[0].skipTaskbar).toBe(true);
-    });
-
-    it('creates overlay with correct default size', () => {
-      initWindowManager();
-      expect(mockWindowConstructorCalls[0].width).toBe(600);
-      expect(mockWindowConstructorCalls[0].height).toBe(300);
-    });
-
-    it('creates overlay with minimum size constraints', () => {
-      initWindowManager();
-      expect(mockWindowConstructorCalls[0].minWidth).toBe(400);
-      expect(mockWindowConstructorCalls[0].minHeight).toBe(200);
-    });
-
-    it('creates overlay with saved size from settings', () => {
-      mockSettingsData.windowSize = { width: 800, height: 400 };
-      initWindowManager();
-      expect(mockWindowConstructorCalls[0].width).toBe(800);
-      expect(mockWindowConstructorCalls[0].height).toBe(400);
-    });
-
-    it('creates overlay with preload script path', () => {
-      initWindowManager();
-      const webPrefs = mockWindowConstructorCalls[0].webPreferences as Record<string, unknown>;
-      expect(webPrefs.preload).toContain('preload');
-      expect(webPrefs.preload).toMatch(/index\.js$/);
-    });
-
-    it('loads overlay renderer HTML', () => {
-      initWindowManager();
-      const win = getOverlayWindow()!;
-      expect((win as unknown as { loadedFile: string }).loadedFile).toContain('overlay');
-    });
-
-    it('registers before-quit handler on app', () => {
-      initWindowManager();
-      expect(mockAppEventHandlers.has('before-quit')).toBe(true);
-    });
-  });
-
-  describe('getOverlayWindow', () => {
-    it('returns the window after init', () => {
-      initWindowManager();
-      expect(getOverlayWindow()).not.toBeNull();
-    });
   });
 
   describe('showOverlay', () => {
@@ -286,135 +218,6 @@ describe('Window Manager', () => {
       toggleOverlay();
       const win = getOverlayWindow()!;
       expect(win.isVisible()).toBe(false);
-    });
-  });
-
-  describe('position validation', () => {
-    it('resets position when saved position is off all displays', () => {
-      mockSettingsData.windowPosition = { x: 5000, y: 5000 };
-      initWindowManager();
-      // The constructor should NOT have x/y set since position is invalid
-      expect(mockWindowConstructorCalls[0].x).toBeUndefined();
-      expect(mockWindowConstructorCalls[0].y).toBeUndefined();
-    });
-
-    it('uses saved position on a connected display', () => {
-      mockSettingsData.windowPosition = { x: 100, y: 100 };
-      initWindowManager();
-      expect(mockWindowConstructorCalls[0].x).toBe(100);
-      expect(mockWindowConstructorCalls[0].y).toBe(100);
-    });
-
-    it('centers window on show when saved position is invalid', () => {
-      mockSettingsData.windowPosition = { x: 5000, y: 5000 };
-      initWindowManager();
-      showOverlay();
-      const win = getOverlayWindow()!;
-      const bounds = win.getBounds();
-      // Should be centered (mock center is 660, 390), not at 5000, 5000
-      expect(bounds.x).not.toBe(5000);
-      expect(bounds.y).not.toBe(5000);
-    });
-
-    it('validates across multiple displays', () => {
-      mockDisplays.length = 0;
-      mockDisplays.push(
-        { bounds: { x: 0, y: 0, width: 1920, height: 1080 }, workArea: { x: 0, y: 0, width: 1920, height: 1040 } },
-        { bounds: { x: 1920, y: 0, width: 1920, height: 1080 }, workArea: { x: 1920, y: 0, width: 1920, height: 1040 } },
-      );
-      mockSettingsData.windowPosition = { x: 2000, y: 100 };
-      initWindowManager();
-      expect(mockWindowConstructorCalls[0].x).toBe(2000);
-      expect(mockWindowConstructorCalls[0].y).toBe(100);
-    });
-  });
-
-  describe('opacity on focus/blur', () => {
-    it('sets opacity to 1.0 on focus', () => {
-      initWindowManager();
-      const win = getOverlayWindow()! as unknown as { emit: (e: string) => void };
-      win.emit('focus');
-      expect(getOverlayWindow()!.getOpacity()).toBe(1.0);
-    });
-
-    it('sets opacity to 0.95 on blur', () => {
-      initWindowManager();
-      const win = getOverlayWindow()! as unknown as { emit: (e: string) => void };
-      win.emit('blur');
-      expect(getOverlayWindow()!.getOpacity()).toBe(0.95);
-    });
-  });
-
-  describe('close interception', () => {
-    it('converts close to hide when app is not quitting', () => {
-      initWindowManager();
-      showOverlay();
-      const win = getOverlayWindow()! as unknown as { emit: (e: string, ...args: unknown[]) => void };
-      const closeEvent = { preventDefault: vi.fn() };
-      win.emit('close', closeEvent);
-      expect(closeEvent.preventDefault).toHaveBeenCalled();
-    });
-
-    it('allows close when app is quitting', () => {
-      initWindowManager();
-      showOverlay();
-      // Trigger before-quit
-      const beforeQuitHandlers = mockAppEventHandlers.get('before-quit') ?? [];
-      for (const handler of beforeQuitHandlers) {
-        handler();
-      }
-      const win = getOverlayWindow()! as unknown as { emit: (e: string, ...args: unknown[]) => void };
-      const closeEvent = { preventDefault: vi.fn() };
-      win.emit('close', closeEvent);
-      expect(closeEvent.preventDefault).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('showSettings', () => {
-    it('creates a settings window', () => {
-      initWindowManager();
-      showSettings();
-      // overlay + settings = 2 constructor calls
-      expect(mockWindowConstructorCalls).toHaveLength(2);
-    });
-
-    it('creates settings as a standard framed window', () => {
-      initWindowManager();
-      showSettings();
-      const settingsOpts = mockWindowConstructorCalls[1];
-      expect(settingsOpts.frame).toBe(true);
-    });
-
-    it('creates settings window with preload script path', () => {
-      initWindowManager();
-      showSettings();
-      const settingsOpts = mockWindowConstructorCalls[1];
-      const webPrefs = settingsOpts.webPreferences as Record<string, unknown>;
-      expect(webPrefs.preload).toContain('preload');
-      expect(webPrefs.preload).toMatch(/index\.js$/);
-    });
-
-    it('creates settings with normal taskbar behavior', () => {
-      initWindowManager();
-      showSettings();
-      const settingsOpts = mockWindowConstructorCalls[1];
-      expect(settingsOpts.skipTaskbar).toBe(false);
-    });
-
-    it('loads settings renderer HTML', () => {
-      initWindowManager();
-      showSettings();
-      // The second BrowserWindow should load settings HTML
-      // We verify via constructor calls since we can't easily get the instance
-      expect(mockWindowConstructorCalls).toHaveLength(2);
-    });
-
-    it('does not create a second settings window if already open', () => {
-      initWindowManager();
-      showSettings();
-      showSettings();
-      // Should still be 2 constructor calls (overlay + 1 settings)
-      expect(mockWindowConstructorCalls).toHaveLength(2);
     });
   });
 });
