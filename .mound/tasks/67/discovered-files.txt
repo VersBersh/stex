@@ -1,0 +1,2 @@
+- .mound/tasks/19/6-discovered-tasks.md
+- .mound/tasks/14/6-discovered-tasks.md
