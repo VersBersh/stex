@@ -52,6 +52,13 @@ export interface AppSettings {
   windowSize: { width: number; height: number };
 }
 
+export interface AudioDevice {
+  id: number;
+  name: string;
+  maxInputChannels: number;
+  defaultSampleRate: number;
+}
+
 export interface TranscriptionRecord {
   id: string;
   text: string;
