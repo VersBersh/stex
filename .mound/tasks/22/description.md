@@ -1,0 +1,8 @@
+# Discovery Triage
+
+Triage the following discovered task files:
+
+- .mound/tasks/1/6-discovered-tasks.md
+- .mound/tasks/20/6-discovered-tasks.md
+- .mound/tasks/3/6-discovered-tasks.md
+- .mound/tasks/10/6-discovered-tasks.md
