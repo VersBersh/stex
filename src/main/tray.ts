@@ -1,17 +1,16 @@
 import { Tray, Menu, nativeImage, app } from 'electron';
+import * as path from 'path';
 import { toggleOverlay, showSettings } from './window';
 
 let tray: Tray | null = null;
 
-// Minimal 16x16 RGBA PNG — solid dark-grey square as placeholder tray icon.
-// Generated from the smallest valid PNG structure (IHDR + single-colour IDAT + IEND).
-const TRAY_ICON_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAG0lEQVR4' +
-  'AWMYBaNgFIyCUTAKRsEoGAWkYwAEEAABhLpMQAAAAABJRU5ErkJggg==';
-
 function createTrayIcon() {
-  const buf = Buffer.from(TRAY_ICON_BASE64, 'base64');
-  return nativeImage.createFromBuffer(buf);
+  const iconPath = path.join(app.getAppPath(), 'resources', 'tray-icon.ico');
+  const icon = nativeImage.createFromPath(iconPath);
+  if (icon.isEmpty()) {
+    throw new Error(`Tray icon not found at ${iconPath}`);
+  }
+  return icon;
 }
 
 export function initTray(): void {

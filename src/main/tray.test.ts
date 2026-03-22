@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // --- Mock setup via vi.hoisted ---
-const { mockTrayInstances, mockMenuTemplates, mockToggleOverlay, mockShowSettings, mockAppQuit } = vi.hoisted(() => {
+const { mockTrayInstances, mockMenuTemplates, mockToggleOverlay, mockShowSettings, mockAppQuit, mockCreateFromPath, mockIconEmpty } = vi.hoisted(() => {
   const mockTrayInstances: Array<{
     icon: unknown;
     tooltip: string | null;
@@ -12,12 +12,14 @@ const { mockTrayInstances, mockMenuTemplates, mockToggleOverlay, mockShowSetting
   const mockToggleOverlay = vi.fn();
   const mockShowSettings = vi.fn();
   const mockAppQuit = vi.fn();
-  return { mockTrayInstances, mockMenuTemplates, mockToggleOverlay, mockShowSettings, mockAppQuit };
+  const mockCreateFromPath = vi.fn();
+  const mockIconEmpty = { value: false };
+  return { mockTrayInstances, mockMenuTemplates, mockToggleOverlay, mockShowSettings, mockAppQuit, mockCreateFromPath, mockIconEmpty };
 });
 
 // --- Mock electron ---
 vi.mock('electron', () => {
-  const MOCK_NATIVE_IMAGE = { _isMockNativeImage: true };
+  const MOCK_NATIVE_IMAGE = { _isMockNativeImage: true, isEmpty: () => mockIconEmpty.value };
 
   class MockTray {
     private _icon: unknown;
@@ -64,10 +66,14 @@ vi.mock('electron', () => {
       },
     },
     nativeImage: {
-      createFromBuffer: () => MOCK_NATIVE_IMAGE,
+      createFromPath: (...args: unknown[]) => {
+        mockCreateFromPath(...args);
+        return MOCK_NATIVE_IMAGE;
+      },
     },
     app: {
       quit: (...args: unknown[]) => mockAppQuit(...args),
+      getAppPath: () => '/mock-app',
     },
   };
 });
@@ -87,6 +93,8 @@ describe('Tray Manager', () => {
     mockToggleOverlay.mockClear();
     mockShowSettings.mockClear();
     mockAppQuit.mockClear();
+    mockCreateFromPath.mockClear();
+    mockIconEmpty.value = false;
     destroyTray();
   });
 
@@ -96,9 +104,12 @@ describe('Tray Manager', () => {
       expect(mockTrayInstances).toHaveLength(1);
     });
 
-    it('creates tray with a NativeImage icon', () => {
+    it('creates tray with a NativeImage icon loaded from the correct path', () => {
       initTray();
-      expect(mockTrayInstances[0].icon).toEqual({ _isMockNativeImage: true });
+      expect(mockTrayInstances[0].icon).toEqual({ _isMockNativeImage: true, isEmpty: expect.any(Function) });
+      expect(mockCreateFromPath).toHaveBeenCalledWith(
+        expect.stringMatching(/mock-app[/\\]resources[/\\]tray-icon\.ico$/),
+      );
     });
 
     it('sets tooltip to Stex', () => {
@@ -141,6 +152,11 @@ describe('Tray Manager', () => {
       const quitItem = mockMenuTemplates[0][3];
       (quitItem.click as () => void)();
       expect(mockAppQuit).toHaveBeenCalledOnce();
+    });
+
+    it('throws if icon file is missing (isEmpty)', () => {
+      mockIconEmpty.value = true;
+      expect(() => initTray()).toThrow('Tray icon not found');
     });
 
     it('destroys previous tray when called twice', () => {
