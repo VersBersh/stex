@@ -1,0 +1,8 @@
+**Verdict** — `Approved with Notes`
+
+**Issues**
+1. Minor — `Single Responsibility` / `Clean Code (durable abstraction)` in [spec/decisions.md:63](/C:/code/draftable/stex/.mound/worktrees/worker-1-d20c45fd/spec/decisions.md#L63), [spec/decisions.md:71](/C:/code/draftable/stex/.mound/worktrees/worker-1-d20c45fd/spec/decisions.md#L71), [spec/decisions.md:73](/C:/code/draftable/stex/.mound/worktrees/worker-1-d20c45fd/spec/decisions.md#L73), [spec/decisions.md:79](/C:/code/draftable/stex/.mound/worktrees/worker-1-d20c45fd/spec/decisions.md#L79).  
+The ADR is structurally sound, but it mixes the stable architectural decision with volatile evaluation details: exact SDK version/date, unpacked size, test count, and time-based revisit thresholds. That gives this single decision entry more than one reason to change: the architecture might stay the same while the supporting market facts age out. ADRs are most useful when they capture enduring design intent and durable rationale.  
+Suggested fix: keep the decision and core rationale, but move transient evidence into task notes or an appendix, or rephrase it in stable terms (for example, “the SDK is early-stage” rather than pinning it to a specific month and package size).
+
+The design reasoning itself is clear and pragmatic: the entry explains the current boundary around `SonioxClient`, the hidden coupling to transport-level disconnect classification, and why that makes an SDK swap non-trivial. No source-level SOLID or clean-code regressions are introduced by this diff, and the file remains well under the 300-line smell threshold.
