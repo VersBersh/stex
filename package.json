@@ -2,6 +2,9 @@
   "name": "stex",
   "version": "0.1.0",
   "description": "Live speech-to-text with inline correction",
+  "engines": {
+    "node": ">=20.19.0 || >=22.12.0"
+  },
   "main": "dist/main/index.js",
   "scripts": {
     "build": "webpack --config webpack.main.config.js && webpack --config webpack.renderer.config.js",

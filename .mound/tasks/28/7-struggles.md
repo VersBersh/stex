@@ -1,0 +1,1 @@
+No struggles. The conflict was straightforward — package.json had diverged because T21 added `naudiodon` to dependencies on main after the original T24 commit was created. Resolution was simply adding the `engines` field to the current main version of package.json.
