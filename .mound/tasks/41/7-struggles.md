@@ -1,0 +1,1 @@
+No struggles. The conflict was a single, straightforward merge in `src/main/window.ts` where main had added `preload-settings.js` to the settings window while the incoming commit replaced it with the unified `../preload/index.js` path. Resolution was to use the incoming unified preload path.

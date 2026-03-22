@@ -60,7 +60,7 @@ function createOverlayWindowInternal(): BrowserWindow {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, '../preload/index.js'),
     },
   };
 
@@ -248,7 +248,7 @@ export function showSettings(): void {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload-settings.js'),
+      preload: path.join(__dirname, '../preload/index.js'),
     },
   });
 

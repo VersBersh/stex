@@ -196,6 +196,13 @@ describe('Window Manager', () => {
       expect(mockWindowConstructorCalls[0].height).toBe(400);
     });
 
+    it('creates overlay with preload script path', () => {
+      initWindowManager();
+      const webPrefs = mockWindowConstructorCalls[0].webPreferences as Record<string, unknown>;
+      expect(webPrefs.preload).toContain('preload');
+      expect(webPrefs.preload).toMatch(/index\.js$/);
+    });
+
     it('loads overlay renderer HTML', () => {
       initWindowManager();
       const win = getOverlayWindow()!;
@@ -376,6 +383,15 @@ describe('Window Manager', () => {
       showSettings();
       const settingsOpts = mockWindowConstructorCalls[1];
       expect(settingsOpts.frame).toBe(true);
+    });
+
+    it('creates settings window with preload script path', () => {
+      initWindowManager();
+      showSettings();
+      const settingsOpts = mockWindowConstructorCalls[1];
+      const webPrefs = settingsOpts.webPreferences as Record<string, unknown>;
+      expect(webPrefs.preload).toContain('preload');
+      expect(webPrefs.preload).toMatch(/index\.js$/);
     });
 
     it('creates settings with normal taskbar behavior', () => {

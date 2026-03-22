@@ -126,6 +126,8 @@ Session Manager (Main Process)
 | Renderer → Main | `session:request-pause` | — | User clicked pause button |
 | Renderer → Main | `session:request-resume` | — | User clicked resume button |
 | Renderer → Main | `window:hide` | — | Hide the overlay window (title bar button or Escape key) |
+| Renderer → Main | `settings:get` | — | Request current settings |
+| Renderer → Main | `settings:set` | `key: string, value: unknown` | Update a single setting |
 | Main → Renderer | `settings:updated` | `AppSettings` | Push settings changes |
 
 ## File Structure
@@ -162,9 +164,12 @@ stex/
           ApiKey.tsx          # Soniox API key config
           Hotkeys.tsx         # Hotkey customization
           History.tsx         # Transcription history (future)
+    preload/
+      index.ts               # Preload bridge (contextBridge.exposeInMainWorld)
     shared/
       types.ts               # Shared types (IPC channels, settings, tokens)
       ipc.ts                 # IPC channel name constants
+      preload.d.ts           # Type declarations for window.api bridge
   package.json
   electron-builder.json      # Build/packaging config
 ```
