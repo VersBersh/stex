@@ -80,6 +80,14 @@ export function createEditorBlockManager() {
       return blocks.reduce((sum, b) => sum + b.text.length, 0);
     },
 
+    getSnapshot(): EditorBlock[] {
+      return blocks.map(b => ({ ...b }));
+    },
+
+    restoreSnapshot(snapshot: ReadonlyArray<Readonly<EditorBlock>>): void {
+      blocks = snapshot.map(b => ({ ...b }));
+    },
+
     applyEdit(changeOffset: number, removedLength: number, insertedText: string): 'tail' | 'mid' {
       const docLen = manager.getDocumentLength();
 
@@ -149,3 +157,39 @@ export function createEditorBlockManager() {
 }
 
 export type EditorBlockManager = ReturnType<typeof createEditorBlockManager>;
+
+export function createBlockHistory(blockManager: EditorBlockManager) {
+  const undoStack: EditorBlock[][] = [];
+  const redoStack: EditorBlock[][] = [];
+
+  return {
+    get undoSize() { return undoStack.length; },
+    get redoSize() { return redoStack.length; },
+
+    captureBeforeEdit(): void {
+      undoStack.push(blockManager.getSnapshot());
+      redoStack.length = 0;
+    },
+
+    handleUndo(): void {
+      if (undoStack.length > 0) {
+        redoStack.push(blockManager.getSnapshot());
+        blockManager.restoreSnapshot(undoStack.pop()!);
+      }
+    },
+
+    handleRedo(): void {
+      if (redoStack.length > 0) {
+        undoStack.push(blockManager.getSnapshot());
+        blockManager.restoreSnapshot(redoStack.pop()!);
+      }
+    },
+
+    clear(): void {
+      undoStack.length = 0;
+      redoStack.length = 0;
+    },
+  };
+}
+
+export type BlockHistory = ReturnType<typeof createBlockHistory>;

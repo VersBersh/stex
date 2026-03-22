@@ -64,6 +64,17 @@ Paragraph boundaries in Lexical (multiple `ParagraphNode` children of the root) 
 
 Only user edits (typing, deleting, pasting) are part of the Lexical undo history. Programmatic appends of transcribed text are **not** undoable — `Ctrl+Z` never removes transcription output.
 
+#### Block Manager Synchronization
+
+The block manager's full state (block text, structure, and `modified` flags) must be kept in sync with Lexical's undo/redo operations:
+
+- Before each user edit is applied to the block manager, a snapshot of the entire `EditorBlock[]` array is captured and stored in a parallel undo stack.
+- When the user undoes an edit (`Ctrl+Z`), the block manager restores the full block state from the corresponding snapshot.
+- When the user redoes an edit (`Ctrl+Y`), the block manager restores the post-edit block state.
+- Parallel stacks are cleared when transcription tokens are committed (since the Lexical undo/redo stacks are also cleared at that point).
+
+This ensures that undoing an edit reverts both the block text and the `modified` flag to their pre-edit values, keeping the block manager aligned with the editor state and preventing unnecessary block fragmentation.
+
 ## GhostText
 
 The current non-final tokens being displayed at the tail of the document. This is ephemeral — it gets replaced with every new Soniox response.

@@ -46,6 +46,12 @@ When new finalized tokens arrive from Soniox:
 
 This produces an alternating sequence of blocks by source when the user interleaves typing and speaking.
 
+### Undo/Redo of Typed Text
+
+- When the user types at the document tail (creating or extending a user block) and then undoes, the block manager restores the pre-typing block state — including removing or reverting the trailing user block
+- Redo restores the user block as it was after typing
+- This is handled by the same block-state snapshot mechanism described in [models — Block Manager Synchronization](../models.md#block-manager-synchronization)
+
 ### Whitespace Handling
 
 Soniox tokens include their own whitespace (e.g. `"How are "` with a trailing space). When a user types text at the document tail and then resumes speaking:

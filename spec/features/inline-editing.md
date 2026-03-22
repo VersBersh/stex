@@ -30,6 +30,13 @@ When the user moves the cursor back to the end of committed text (e.g., Ctrl+End
 - User edits mark the affected block as `modified: true`, preventing any future overwrite by incoming tokens
 - New final tokens from Soniox always append at the **document tail**, regardless of where the user's cursor is
 
+### Undo/Redo of Edits
+
+- Undoing an edit to committed text reverts the block manager to its pre-edit state: block text, `modified` flags, and block structure are all restored
+- If a block was `modified: false` before the user edit, undoing restores it to `modified: false`
+- If blocks were split, merged, or removed by a cross-block edit, undo restores the original block structure
+- Redoing re-applies the edit and restores the post-edit block state
+
 ### Editing During Active Transcription
 
 - While the user is editing mid-document, new tokens still arrive

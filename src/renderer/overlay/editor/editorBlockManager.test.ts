@@ -578,4 +578,118 @@ describe('EditorBlockManager', () => {
       expect(manager.getBlocks()[0].id).not.toBe('block-1');
     });
   });
+
+  describe('getSnapshot / restoreSnapshot', () => {
+    it('returns a deep clone of current blocks', () => {
+      manager.commitFinalTokens([makeToken('Hello')]);
+      const snapshot = manager.getSnapshot();
+
+      expect(snapshot).toHaveLength(1);
+      expect(snapshot[0]).toMatchObject({ text: 'Hello', source: 'soniox', modified: false });
+
+      // Mutating snapshot should not affect manager
+      snapshot[0].text = 'Changed';
+      expect(manager.getBlocks()[0].text).toBe('Hello');
+    });
+
+    it('restores blocks from a snapshot', () => {
+      manager.commitFinalTokens([makeToken('Hello')]);
+      const snapshot = manager.getSnapshot();
+
+      manager.applyEdit(0, 5, 'Howdy');
+      expect(manager.getBlocks()[0].modified).toBe(true);
+      expect(manager.getBlocks()[0].text).toBe('Howdy');
+
+      manager.restoreSnapshot(snapshot);
+      expect(manager.getBlocks()[0].text).toBe('Hello');
+      expect(manager.getBlocks()[0].modified).toBe(false);
+    });
+
+    it('restore does not alias with the provided snapshot', () => {
+      manager.commitFinalTokens([makeToken('Hello')]);
+      const snapshot = manager.getSnapshot();
+
+      manager.restoreSnapshot(snapshot);
+      // Mutating the original snapshot after restore should not affect manager
+      snapshot[0].text = 'Changed';
+      expect(manager.getBlocks()[0].text).toBe('Hello');
+    });
+  });
+
+  describe('undo/redo integration (snapshot-based)', () => {
+    it('edit then undo restores modified flag to false', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+      const preEditSnapshot = manager.getSnapshot();
+
+      manager.applyEdit(5, 1, '-'); // "Hello-world", modified: true
+      expect(manager.getBlocks()[0].modified).toBe(true);
+
+      manager.restoreSnapshot(preEditSnapshot);
+      expect(manager.getBlocks()[0].modified).toBe(false);
+      expect(manager.getBlocks()[0].text).toBe('Hello world');
+    });
+
+    it('edit then undo then redo re-applies modified flag', () => {
+      manager.commitFinalTokens([makeToken('Hello world')]);
+      const preEditSnapshot = manager.getSnapshot();
+
+      manager.applyEdit(5, 1, '-'); // "Hello-world", modified: true
+      const postEditSnapshot = manager.getSnapshot();
+
+      // Simulate undo
+      manager.restoreSnapshot(preEditSnapshot);
+      expect(manager.getBlocks()[0].modified).toBe(false);
+
+      // Simulate redo
+      manager.restoreSnapshot(postEditSnapshot);
+      expect(manager.getBlocks()[0].modified).toBe(true);
+      expect(manager.getBlocks()[0].text).toBe('Hello-world');
+    });
+
+    it('snapshot captures multi-block state correctly', () => {
+      manager.commitFinalTokens([makeToken('Hello ')]);
+      manager.applyEdit(6, 0, 'world'); // tail user block
+      manager.commitFinalTokens([makeToken(' end')]);
+
+      const snapshot = manager.getSnapshot();
+      expect(snapshot).toHaveLength(3);
+
+      manager.clear();
+      expect(manager.getBlocks()).toHaveLength(0);
+
+      manager.restoreSnapshot(snapshot);
+      expect(manager.getBlocks()).toHaveLength(3);
+      expect(manager.getDocumentText()).toBe('Hello world end');
+    });
+
+    it('undo of cross-block edit restores removed blocks', () => {
+      manager.commitFinalTokens([makeToken('Hello ')]);
+      manager.applyEdit(6, 0, 'beautiful '); // user block
+      manager.commitFinalTokens([makeToken('world')]);
+      // blocks: [soniox: "Hello "], [user: "beautiful "], [soniox: "world"]
+
+      const preEditSnapshot = manager.getSnapshot();
+      expect(preEditSnapshot).toHaveLength(3);
+
+      // Cross-block delete: remove "beautiful world"
+      manager.applyEdit(6, 15, 'earth');
+      expect(manager.getDocumentText()).toBe('Hello earth');
+
+      manager.restoreSnapshot(preEditSnapshot);
+      expect(manager.getBlocks()).toHaveLength(3);
+      expect(manager.getDocumentText()).toBe('Hello beautiful world');
+    });
+
+    it('undo of tail typing removes user block', () => {
+      manager.commitFinalTokens([makeToken('Hello')]);
+      const preTypingSnapshot = manager.getSnapshot();
+
+      manager.applyEdit(5, 0, ' world'); // tail insertion creates user block
+      expect(manager.getBlocks()).toHaveLength(2);
+
+      manager.restoreSnapshot(preTypingSnapshot);
+      expect(manager.getBlocks()).toHaveLength(1);
+      expect(manager.getDocumentText()).toBe('Hello');
+    });
+  });
 });

@@ -11,16 +11,17 @@ import {
   $isParagraphNode,
 } from 'lexical';
 import type { HistoryState } from '@lexical/history';
-import type { EditorBlockManager } from './editorBlockManager';
+import type { EditorBlockManager, BlockHistory } from './editorBlockManager';
 import type { SonioxToken } from '../../../shared/types';
 import { useOverlay } from '../OverlayContext';
 
 interface TokenCommitPluginProps {
   blockManager: EditorBlockManager;
   historyState: HistoryState;
+  blockHistory: BlockHistory;
 }
 
-export function TokenCommitPlugin({ blockManager, historyState }: TokenCommitPluginProps) {
+export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: TokenCommitPluginProps) {
   const [editor] = useLexicalComposerContext();
   const { registerClearHook } = useOverlay();
 
@@ -31,8 +32,9 @@ export function TokenCommitPlugin({ blockManager, historyState }: TokenCommitPlu
       historyState.undoStack.length = 0;
       historyState.redoStack.length = 0;
       historyState.current = null;
+      blockHistory.clear();
     });
-  }, [registerClearHook, blockManager, historyState]);
+  }, [registerClearHook, blockManager, historyState, blockHistory]);
 
   // Reset undo/redo history when editor is cleared (e.g. onShow: 'fresh')
   useEffect(() => {
@@ -40,8 +42,9 @@ export function TokenCommitPlugin({ blockManager, historyState }: TokenCommitPlu
       historyState.undoStack.length = 0;
       historyState.redoStack.length = 0;
       historyState.current = { editor, editorState: editor.getEditorState() };
+      blockHistory.clear();
     });
-  }, [registerClearHook, historyState, editor]);
+  }, [registerClearHook, historyState, editor, blockHistory]);
 
   useEffect(() => {
     const unsubscribe = window.api.onTokensFinal((tokens: SonioxToken[]) => {
@@ -125,10 +128,11 @@ export function TokenCommitPlugin({ blockManager, historyState }: TokenCommitPlu
       historyState.undoStack.length = 0;
       historyState.redoStack.length = 0;
       historyState.current = { editor, editorState: editor.getEditorState() };
+      blockHistory.clear();
     });
 
     return unsubscribe;
-  }, [editor, blockManager, historyState]);
+  }, [editor, blockManager, historyState, blockHistory]);
 
   return null;
 }

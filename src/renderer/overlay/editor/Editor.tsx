@@ -10,9 +10,10 @@ import { createEmptyHistoryState } from '@lexical/history';
 import { GhostTextPlugin } from './GhostTextPlugin';
 import { useOverlay } from '../OverlayContext';
 import { TokenCommitPlugin } from './TokenCommitPlugin';
-import { createEditorBlockManager } from './editorBlockManager';
+import { createEditorBlockManager, createBlockHistory } from './editorBlockManager';
 import { InlineEditPlugin } from './InlineEditPlugin';
 import { UserTypingPlugin } from './UserTypingPlugin';
+import { UndoRedoBlockSyncPlugin } from './UndoRedoBlockSyncPlugin';
 
 const initialConfig = {
   namespace: 'StexEditor',
@@ -33,6 +34,7 @@ function EditorBridge() {
 export function Editor() {
   const historyState = useMemo(() => createEmptyHistoryState(), []);
   const blockManager = useMemo(() => createEditorBlockManager(), []);
+  const blockHistory = useMemo(() => createBlockHistory(blockManager), [blockManager]);
 
   return (
     <div className="editor-container">
@@ -44,7 +46,11 @@ export function Editor() {
         <HistoryPlugin externalHistoryState={historyState} />
         <AutoFocusPlugin />
         <EditorBridge />
-        <TokenCommitPlugin blockManager={blockManager} historyState={historyState} />
+        <TokenCommitPlugin blockManager={blockManager} historyState={historyState} blockHistory={blockHistory} />
+        {/* UndoRedoBlockSyncPlugin must be AFTER HistoryPlugin (to observe stack changes)
+            and BEFORE InlineEditPlugin (to snapshot blocks before applyEdit mutates them).
+            JSX order determines useEffect registration order, which determines update listener fire order. */}
+        <UndoRedoBlockSyncPlugin historyState={historyState} blockHistory={blockHistory} />
         <InlineEditPlugin blockManager={blockManager} />
         <UserTypingPlugin blockManager={blockManager} />
         <GhostTextPlugin />
