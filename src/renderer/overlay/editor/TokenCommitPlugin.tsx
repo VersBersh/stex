@@ -53,10 +53,23 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
 
       blockManager.commitFinalTokens(tokens);
 
+      // Capture scroll position before mutation so we can detect whether the
+      // user was already at the bottom (a large append could push scrollHeight
+      // past the threshold if checked after the update).
+      let wasNearBottom = false;
+      const preRoot = editor.getRootElement();
+      if (preRoot) {
+        const c = preRoot.parentElement;
+        if (c) {
+          wasNearBottom = c.scrollHeight - c.scrollTop - c.clientHeight < 50;
+        }
+      }
+
       // Append to editor, bypassing undo history.
       // 'historic' tag causes HistoryPlugin to return DISCARD_HISTORY_CANDIDATE,
       // so this update is not recorded in the undo stack.
       // discrete: true makes the update synchronous.
+      let cursorAtEnd = true;
       editor.update(
         () => {
           const root = $getRoot();
@@ -66,8 +79,6 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
           // Any non-collapsed selection or mid-document caret must be preserved.
           const prevSelection = $getSelection();
           const isRange = $isRangeSelection(prevSelection);
-
-          let cursorAtEnd = true;
           if (isRange) {
             if (!prevSelection.isCollapsed()) {
               cursorAtEnd = false;
@@ -120,6 +131,18 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
         },
         { discrete: true, tag: 'historic' },
       );
+
+      // Scroll the editor container to follow transcription when the cursor
+      // is at the document end and the viewport was near the bottom before the update.
+      if (cursorAtEnd && wasNearBottom) {
+        const rootElement = editor.getRootElement();
+        if (rootElement) {
+          const container = rootElement.parentElement;
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+          }
+        }
+      }
 
       // Invalidate existing undo/redo entries — they contain pre-transcription
       // editor states and restoring them would remove committed transcription text.
