@@ -139,7 +139,10 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
         if (rootElement) {
           const container = rootElement.parentElement;
           if (container) {
-            container.scrollTop = container.scrollHeight;
+            const overflow = container.scrollHeight - container.scrollTop - container.clientHeight;
+            if (overflow > 0) {
+              container.scrollTop = container.scrollHeight;
+            }
           }
         }
       }

@@ -22,11 +22,17 @@ export function GhostTextPlugin(): null {
 
       controller.handleNonFinalTokens(tokens);
 
-      // Scroll to follow ghost text when viewport was near the bottom
+      // Scroll to follow ghost text only when the viewport was near the
+      // bottom AND content actually overflows after the ghost text renders.
+      // Without the overflow check, the first ghost text arrival scrolls
+      // even when everything fits, hiding existing text.
       if (wasNearBottom && rootElement) {
         const container = rootElement.parentElement;
         if (container) {
-          container.scrollTop = container.scrollHeight;
+          const overflow = container.scrollHeight - container.scrollTop - container.clientHeight;
+          if (overflow > 0) {
+            container.scrollTop = container.scrollHeight;
+          }
         }
       }
     });
