@@ -43,8 +43,11 @@ export function $isCursorAtDocumentEnd(): boolean {
  */
 export function $moveCursorToDocumentEnd(): void {
   const root = $getRoot();
-  let lastParagraph = root.getLastChild();
-  if (!$isParagraphNode(lastParagraph)) {
+  const rootLast = root.getLastChild();
+  let lastParagraph;
+  if ($isParagraphNode(rootLast)) {
+    lastParagraph = rootLast;
+  } else {
     // Empty root (e.g. after $getRoot().clear()) — create an empty paragraph
     // so the cursor has somewhere to land.
     lastParagraph = $createParagraphNode();
