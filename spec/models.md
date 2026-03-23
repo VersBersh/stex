@@ -92,7 +92,7 @@ Top-level state for an active transcription session.
 
 ```typescript
 interface SessionState {
-  status: "idle" | "connecting" | "recording" | "paused" | "finalizing" | "error" | "disconnected" | "reconnecting";
+  status: "idle" | "connecting" | "recording" | "paused" | "finalizing" | "error" | "reconnecting";
   blocks: EditorBlock[];
   ghostText: GhostText | null;
   websocketConnected: boolean;

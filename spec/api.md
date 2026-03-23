@@ -124,7 +124,7 @@ function onMessage(response: SonioxResponse) {
 
 | Error | Handling |
 |-------|----------|
-| WebSocket disconnect | Stop mic capture immediately. Show "Disconnected" in status bar. Auto-reconnect with exponential backoff (1s, 2s, 4s, max 30s) — show "Reconnecting..." during attempts. **Do not buffer audio** during disconnect. Once reconnected, show "Reconnected" and wait for user to resume (click Resume or press `Ctrl+P`). Some audio will be lost during the outage — this is acceptable for v1. |
+| WebSocket disconnect | Stop mic capture immediately. Show "Reconnecting..." in status bar. Auto-reconnect with exponential backoff (1s, 2s, 4s, max 30s). **Do not buffer audio** during disconnect. Once reconnected, transition to paused and wait for user to resume (click Resume or press `Ctrl+P`). Some audio will be lost during the outage — this is acceptable for v1. |
 | Invalid API key | Show error in status bar, stop recording. Prompt user to check settings. |
 | Rate limit / quota exceeded | Show error, stop recording. |
 | Audio format mismatch | Should not happen if configured correctly. Log and alert. |

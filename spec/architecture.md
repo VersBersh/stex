@@ -121,7 +121,7 @@ Session Manager (Main Process)
 | Main → Renderer | `session:resumed` | — | Signal recording resumed |
 | Main → Renderer | `tokens:final` | `SonioxToken[]` | New finalized tokens to commit to editor |
 | Main → Renderer | `tokens:nonfinal` | `SonioxToken[]` | Current non-final tokens (replaces previous ghost text) |
-| Main → Renderer | `session:status` | `SessionState.status` | Status changes: `idle`, `connecting`, `recording`, `paused`, `finalizing`, `error`, `disconnected`, `reconnecting` |
+| Main → Renderer | `session:status` | `SessionState.status` | Status changes: `idle`, `connecting`, `recording`, `paused`, `finalizing`, `error`, `reconnecting` |
 | Main → Renderer | `session:text` | — | Request editor text for clipboard copy |
 | Renderer → Main | `session:text` | `string` | Respond with editor text for clipboard copy |
 | Renderer → Main | `session:request-pause` | — | User clicked pause button |

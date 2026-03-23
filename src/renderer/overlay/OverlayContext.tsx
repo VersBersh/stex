@@ -93,7 +93,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     if (sessionStatus === 'recording' || sessionStatus === 'paused') {
       controllerRef.current?.toggle();
     }
-    // No-op in other states (disconnected, reconnecting, error, etc.)
+    // No-op in other states (reconnecting, error, etc.)
   }, [sessionStatus]);
 
   const copyText = useCallback(() => {

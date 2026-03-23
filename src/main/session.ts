@@ -200,7 +200,7 @@ export function initSessionManager(): void {
     onPause: () => { pauseSession(); },
     onResume: () => { resumeSession(); },
     onDismissError: () => {
-      if (status === 'error' || status === 'disconnected') {
+      if (status === 'error') {
         cancelReconnect();
         resetLifecycle();
         status = 'idle';

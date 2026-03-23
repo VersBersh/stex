@@ -475,7 +475,7 @@ describe('Session Manager — Error Handling & Reconnection', () => {
       startAndConnect();
     });
 
-    it('pause is a no-op during disconnected state', () => {
+    it('pause is a no-op during reconnecting state', () => {
       triggerOnDisconnected(1006, 'connection lost');
       mockAudio.stopCapture.mockClear();
 
@@ -488,7 +488,7 @@ describe('Session Manager — Error Handling & Reconnection', () => {
     it('resume is a no-op during reconnecting state', () => {
       triggerOnDisconnected(1006, 'connection lost');
 
-      // Advance to reconnecting
+      // Advance past reconnect delay
       vi.advanceTimersByTime(1000);
       mockAudio.startCapture.mockClear();
 

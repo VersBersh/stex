@@ -33,7 +33,7 @@ Stream microphone audio to the Soniox WebSocket API and display transcribed text
 
 ## Edge Cases
 
-- **Network interruption**: Stop mic capture, show "Disconnected" in status bar. Auto-reconnect with exponential backoff. **Do not buffer audio** — some speech will be lost during the outage. Once reconnected, the user must explicitly resume. This is the v1 behavior; audio buffering may be added in a future version.
+- **Network interruption**: Stop mic capture, show "Reconnecting..." in status bar. Auto-reconnect with exponential backoff. **Do not buffer audio** — some speech will be lost during the outage. Once reconnected, the user must explicitly resume. This is the v1 behavior; audio buffering may be added in a future version.
 - **Silence**: Soniox endpoint detection fires after a pause (configurable 500ms–3000ms), finalizing the current utterance. No special handling needed.
 - **Long sessions**: Soniox supports up to 300 minutes per stream. For longer sessions, transparently reconnect. Note: very long documents may degrade Lexical editor performance — consider this a practical limit for v1.
 

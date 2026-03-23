@@ -7,7 +7,6 @@ const STATUS_TEXT: Record<string, string> = {
   paused: 'Paused',
   finalizing: 'Finalizing...',
   error: 'Error',
-  disconnected: 'Disconnected',
   reconnecting: 'Reconnecting...',
 };
 

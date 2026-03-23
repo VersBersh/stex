@@ -82,7 +82,7 @@ When an error occurs (invalid API key, network failure, quota exceeded):
 - A **compact error banner** appears between the editor and the status bar
 - The banner shows the error message and, where applicable, an action button (e.g. "Open Settings" for API key issues)
 - The banner has a dismiss button (X) to clear it
-- The status bar state text updates to reflect the error (e.g. "Error", "Disconnected")
+- The status bar state text updates to reflect the error (e.g. "Error", "Reconnecting...")
 - Errors are not auto-dismissed — the user must explicitly dismiss them or the error condition must be resolved
 
 ## Themes
