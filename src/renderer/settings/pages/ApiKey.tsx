@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import type { AppSettings } from '../../../shared/types';
 
 interface Props {
@@ -7,20 +7,27 @@ interface Props {
 }
 
 export function ApiKey({ settings, onSettingChange }: Props) {
-  const [value, setValue] = useState(settings.sonioxApiKey);
-  const [showKey, setShowKey] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [newValue, setNewValue] = useState('');
   const [saved, setSaved] = useState(false);
-  const isEditing = useRef(false);
 
-  useEffect(() => {
-    if (!isEditing.current) {
-      setValue(settings.sonioxApiKey);
-    }
-  }, [settings.sonioxApiKey]);
+  const hasKey = settings.sonioxApiKey.length > 0;
 
   const handleSave = () => {
-    onSettingChange('sonioxApiKey', value);
-    isEditing.current = false;
+    onSettingChange('sonioxApiKey', newValue);
+    setEditing(false);
+    setNewValue('');
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleCancel = () => {
+    setEditing(false);
+    setNewValue('');
+  };
+
+  const handleRemove = () => {
+    onSettingChange('sonioxApiKey', '');
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -30,38 +37,74 @@ export function ApiKey({ settings, onSettingChange }: Props) {
       <h2>API Key</h2>
       <div className="setting-group">
         <label htmlFor="api-key">Soniox API Key</label>
+        {hasKey && !editing ? (
+          <div className="password-input">
+            <input
+              id="api-key"
+              type="text"
+              value={settings.sonioxApiKey}
+              readOnly
+            />
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setEditing(true)}
+            >
+              Change
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={handleRemove}
+            >
+              Remove
+            </button>
+          </div>
+        ) : (
+          <div className="password-input">
+            <input
+              id="api-key"
+              type="password"
+              value={newValue}
+              onChange={(e) => setNewValue(e.target.value)}
+              placeholder="Enter your Soniox API key"
+            />
+          </div>
+        )}
+        <p className="hint">
+          Your API key is stored securely and used to authenticate with the Soniox speech-to-text service.
+        </p>
+      </div>
+      {editing ? (
         <div className="password-input">
-          <input
-            id="api-key"
-            type={showKey ? 'text' : 'password'}
-            value={value}
-            onChange={(e) => {
-              isEditing.current = true;
-              setValue(e.target.value);
-              setSaved(false);
-            }}
-            placeholder="Enter your Soniox API key"
-          />
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={!newValue}
+          >
+            Save
+          </button>
           <button
             type="button"
             className="btn"
-            onClick={() => setShowKey(!showKey)}
+            onClick={handleCancel}
           >
-            {showKey ? 'Hide' : 'Show'}
+            Cancel
           </button>
         </div>
-        <p className="hint">
-          Your API key is stored locally and used to authenticate with the Soniox speech-to-text service.
-        </p>
-      </div>
-      <button
-        type="button"
-        className="btn btn-primary"
-        onClick={handleSave}
-        disabled={value === settings.sonioxApiKey}
-      >
-        {saved ? 'Saved' : 'Save'}
-      </button>
+      ) : !hasKey ? (
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={handleSave}
+          disabled={!newValue}
+        >
+          {saved ? 'Saved' : 'Save'}
+        </button>
+      ) : saved ? (
+        <p className="hint">Saved</p>
+      ) : null}
     </div>
   );
 }

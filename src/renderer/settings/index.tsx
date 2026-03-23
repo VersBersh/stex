@@ -51,7 +51,12 @@ function App() {
 
   const handleSettingChange = useCallback(
     <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
-      setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
+      // Don't optimistically set sonioxApiKey — the IPC broadcast will
+      // provide the masked value. Setting it here would briefly expose
+      // the plaintext key in React state.
+      if (key !== 'sonioxApiKey') {
+        setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
+      }
       window.settingsApi.setSetting(key, value);
     },
     [],

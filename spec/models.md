@@ -112,7 +112,7 @@ interface AppSettings {
   onHide: "clipboard" | "none";   // what to do with text when window hides
   onShow: "fresh" | "append";     // "fresh" clears editor on show, "append" keeps previous text
   audioInputDevice: string | null;  // PortAudio device name, null = system default
-  sonioxApiKey: string;
+  sonioxApiKey: string;            // encrypted at rest via safeStorage
   sonioxModel: string;             // Soniox model identifier
   language: string;                // language hint for Soniox
   maxEndpointDelayMs: number;      // 500–3000, controls finalization speed
@@ -131,6 +131,8 @@ interface AppSettings {
 | `sonioxApiKey` | Non-empty saved value > `SONIOX_API_KEY` environment variable > empty string |
 
 The resolved environment variable value is **never** persisted back to `settings.json`, so `getSettings()` may return a `sonioxApiKey` derived from the environment that does not appear on disk.
+
+The `sonioxApiKey` is encrypted at rest using Electron's `safeStorage` API and stored as a base64-encoded blob. Renderer-facing IPC (`settings:get`, `settings:updated`) returns a masked display value (e.g. `••••••••abcd`) — the plaintext key is only available to main-process consumers via `getSettings()`.
 
 ## TranscriptionRecord
 

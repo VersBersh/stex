@@ -43,7 +43,7 @@ vi.mock('electron-store', () => {
   };
 });
 
-// Mock electron
+// Mock electron (including safeStorage for API key encryption)
 vi.mock('electron', () => ({
   ipcMain: {
     handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
@@ -53,12 +53,21 @@ vi.mock('electron', () => ({
   BrowserWindow: {
     getAllWindows: () => mockWindows,
   },
+  safeStorage: {
+    encryptString: (text: string) => Buffer.from(`enc:${text}`),
+    decryptString: (buf: Buffer) => {
+      const s = buf.toString();
+      if (!s.startsWith('enc:')) throw new Error('decrypt failed');
+      return s.slice(4);
+    },
+  },
 }));
 
 import {
   resolveSonioxApiKey,
   APP_SETTINGS_DEFAULTS,
   getSettings,
+  getSettingsForRenderer,
   setSetting,
   registerSettingsIpc,
   onSettingsChanged,
@@ -288,5 +297,115 @@ describe('registerSettingsIpc', () => {
     mockStore.set('unknownExtraKey', 'should-not-appear');
     const settings = getSettings();
     expect('unknownExtraKey' in settings).toBe(false);
+  });
+
+  it('SETTINGS_GET handler returns masked sonioxApiKey', async () => {
+    delete process.env.SONIOX_API_KEY;
+    registerSettingsIpc();
+    setSetting('sonioxApiKey', 'my-secret-api-key-1234');
+    const handler = mockHandlers.get(IpcChannels.SETTINGS_GET)!;
+    const result = await handler({}) as AppSettings;
+    // Should be masked, not plaintext
+    expect(result.sonioxApiKey).not.toBe('my-secret-api-key-1234');
+    expect(result.sonioxApiKey).toContain('1234');
+    expect(result.sonioxApiKey).toContain('\u2022');
+  });
+
+  it('SETTINGS_SET handler broadcasts masked sonioxApiKey', async () => {
+    registerSettingsIpc();
+    const mockSend = vi.fn();
+    mockWindows.push({ webContents: { send: mockSend } });
+
+    const handler = mockHandlers.get(IpcChannels.SETTINGS_SET)!;
+    await handler({}, 'sonioxApiKey', 'my-secret-api-key-5678');
+
+    const broadcastedSettings = mockSend.mock.calls[0][1] as AppSettings;
+    expect(broadcastedSettings.sonioxApiKey).not.toBe('my-secret-api-key-5678');
+    expect(broadcastedSettings.sonioxApiKey).toContain('5678');
+    expect(broadcastedSettings.sonioxApiKey).toContain('\u2022');
+  });
+});
+
+describe('API key encryption', () => {
+  beforeEach(() => {
+    mockStore.clear();
+  });
+
+  it('setSetting encrypts sonioxApiKey before storing', () => {
+    setSetting('sonioxApiKey', 'my-secret-key');
+    const stored = mockStore.get('sonioxApiKey') as string;
+    // Should not be the plaintext value
+    expect(stored).not.toBe('my-secret-key');
+    // Should be a base64 string
+    expect(stored).toBeTruthy();
+  });
+
+  it('getSettings decrypts sonioxApiKey from store', () => {
+    delete process.env.SONIOX_API_KEY;
+    setSetting('sonioxApiKey', 'my-secret-key');
+    const settings = getSettings();
+    expect(settings.sonioxApiKey).toBe('my-secret-key');
+  });
+
+  it('handles legacy plaintext values gracefully (migration)', () => {
+    delete process.env.SONIOX_API_KEY;
+    // Simulate a legacy plaintext value directly in the store
+    mockStore.set('sonioxApiKey', 'legacy-plaintext-key');
+    const settings = getSettings();
+    expect(settings.sonioxApiKey).toBe('legacy-plaintext-key');
+  });
+
+  it('does not encrypt non-sonioxApiKey settings', () => {
+    setSetting('hotkey', 'Alt+S');
+    expect(mockStore.get('hotkey')).toBe('Alt+S');
+  });
+
+  it('handles empty sonioxApiKey without encryption', () => {
+    setSetting('sonioxApiKey', '');
+    expect(mockStore.get('sonioxApiKey')).toBe('');
+  });
+});
+
+describe('getSettingsForRenderer', () => {
+  beforeEach(() => {
+    mockStore.clear();
+  });
+
+  it('returns masked sonioxApiKey', () => {
+    delete process.env.SONIOX_API_KEY;
+    setSetting('sonioxApiKey', 'my-long-api-key-abcd');
+    const settings = getSettingsForRenderer();
+    expect(settings.sonioxApiKey).not.toBe('my-long-api-key-abcd');
+    expect(settings.sonioxApiKey).toContain('abcd');
+    expect(settings.sonioxApiKey).toContain('\u2022');
+  });
+
+  it('returns empty string when no key is set', () => {
+    delete process.env.SONIOX_API_KEY;
+    const settings = getSettingsForRenderer();
+    expect(settings.sonioxApiKey).toBe('');
+  });
+
+  it('masks short keys (4 chars or less) without bullets', () => {
+    delete process.env.SONIOX_API_KEY;
+    setSetting('sonioxApiKey', 'abcd');
+    const settings = getSettingsForRenderer();
+    expect(settings.sonioxApiKey).toBe('abcd');
+  });
+
+  it('does not affect other settings fields', () => {
+    delete process.env.SONIOX_API_KEY;
+    setSetting('hotkey', 'Alt+Z');
+    const settings = getSettingsForRenderer();
+    expect(settings.hotkey).toBe('Alt+Z');
+  });
+
+  it('masks env var fallback key', () => {
+    process.env.SONIOX_API_KEY = 'env-key-from-system';
+    mockStore.set('sonioxApiKey', '');
+    const settings = getSettingsForRenderer();
+    expect(settings.sonioxApiKey).toContain('stem');
+    expect(settings.sonioxApiKey).toContain('\u2022');
+    delete process.env.SONIOX_API_KEY;
   });
 });
