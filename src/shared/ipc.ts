@@ -21,4 +21,6 @@ export const IpcChannels = {
   SESSION_OPEN_SETTINGS: 'session:open-settings',
   SESSION_OPEN_MIC_SETTINGS: 'session:open-mic-settings',
   SESSION_DISMISS_ERROR: 'session:dismiss-error',
+  LOG_PATH_GET: 'log:get-path',
+  LOG_REVEAL: 'log:reveal',
 } as const;

@@ -19,6 +19,10 @@ const settingsApi: SettingsAPI = {
 
   getResolvedTheme: () => ipcRenderer.invoke(IpcChannels.THEME_GET),
 
+  getLogPath: () => ipcRenderer.invoke(IpcChannels.LOG_PATH_GET),
+
+  revealLogFile: () => ipcRenderer.invoke(IpcChannels.LOG_REVEAL),
+
   onThemeChanged: (callback: (theme: 'light' | 'dark') => void) => {
     const handler = (_event: unknown, theme: 'light' | 'dark') => callback(theme);
     ipcRenderer.on(IpcChannels.THEME_RESOLVED, handler);

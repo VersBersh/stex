@@ -136,6 +136,8 @@ Session Manager (Main Process)
 | Renderer → Main | `session:open-settings` | — | User clicked "Open Settings" action on error banner |
 | Renderer → Main | `session:open-mic-settings` | — | User clicked "Grant access in Windows Settings" action |
 | Renderer → Main | `session:dismiss-error` | — | User dismissed error banner |
+| Renderer → Main | `log:get-path` | — | Request log file path |
+| Renderer → Main | `log:reveal` | — | Reveal log file/directory in OS file manager |
 
 ## File Structure
 

@@ -1,10 +1,16 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from 'vitest';
 
-const { mockStore, mockHandlers, mockWindows } = vi.hoisted(() => {
+const { mockStore, mockHandlers, mockWindows, mockShell, mockGetLogFilePath, mockExistsSync } = vi.hoisted(() => {
   const mockStore = new Map<string, unknown>();
   const mockHandlers = new Map<string, (...args: unknown[]) => unknown>();
   const mockWindows: Array<{ webContents: { send: (...args: unknown[]) => void } }> = [];
-  return { mockStore, mockHandlers, mockWindows };
+  const mockShell = {
+    showItemInFolder: vi.fn(),
+    openPath: vi.fn(),
+  };
+  const mockGetLogFilePath = vi.fn<() => string | null>(() => null);
+  const mockExistsSync = vi.fn<(p: string) => boolean>(() => true);
+  return { mockStore, mockHandlers, mockWindows, mockShell, mockGetLogFilePath, mockExistsSync };
 });
 
 // Mock electron-store before importing settings module
@@ -61,7 +67,17 @@ vi.mock('electron', () => ({
       return s.slice(4);
     },
   },
+  shell: mockShell,
 }));
+
+vi.mock('./logger', () => ({
+  getLogFilePath: mockGetLogFilePath,
+}));
+
+vi.mock('fs', async () => {
+  const actual = await vi.importActual<typeof import('fs')>('fs');
+  return { ...actual, existsSync: mockExistsSync };
+});
 
 import {
   resolveSonioxApiKey,
@@ -249,6 +265,10 @@ describe('registerSettingsIpc', () => {
     mockHandlers.clear();
     mockWindows.length = 0;
     mockStore.clear();
+    mockShell.showItemInFolder.mockClear();
+    mockShell.openPath.mockClear();
+    mockGetLogFilePath.mockReset();
+    mockExistsSync.mockReset().mockReturnValue(true);
   });
 
   it('registers handlers for SETTINGS_GET and SETTINGS_SET', () => {
@@ -297,6 +317,57 @@ describe('registerSettingsIpc', () => {
     mockStore.set('unknownExtraKey', 'should-not-appear');
     const settings = getSettings();
     expect('unknownExtraKey' in settings).toBe(false);
+  });
+
+  it('registers handlers for LOG_PATH_GET and LOG_REVEAL', () => {
+    registerSettingsIpc();
+    expect(mockHandlers.has(IpcChannels.LOG_PATH_GET)).toBe(true);
+    expect(mockHandlers.has(IpcChannels.LOG_REVEAL)).toBe(true);
+  });
+
+  it('LOG_PATH_GET handler returns the log file path', async () => {
+    registerSettingsIpc();
+    mockGetLogFilePath.mockReturnValue('/tmp/logs/stex.log');
+    const handler = mockHandlers.get(IpcChannels.LOG_PATH_GET)!;
+    const result = await handler({});
+    expect(result).toBe('/tmp/logs/stex.log');
+  });
+
+  it('LOG_PATH_GET handler returns null when no log file', async () => {
+    registerSettingsIpc();
+    mockGetLogFilePath.mockReturnValue(null);
+    const handler = mockHandlers.get(IpcChannels.LOG_PATH_GET)!;
+    const result = await handler({});
+    expect(result).toBeNull();
+  });
+
+  it('LOG_REVEAL handler calls shell.showItemInFolder when file exists', async () => {
+    registerSettingsIpc();
+    mockGetLogFilePath.mockReturnValue('/tmp/logs/stex.log');
+    mockExistsSync.mockReturnValue(true);
+    const handler = mockHandlers.get(IpcChannels.LOG_REVEAL)!;
+    await handler({});
+    expect(mockShell.showItemInFolder).toHaveBeenCalledWith('/tmp/logs/stex.log');
+    expect(mockShell.openPath).not.toHaveBeenCalled();
+  });
+
+  it('LOG_REVEAL handler opens directory when file does not exist', async () => {
+    registerSettingsIpc();
+    mockGetLogFilePath.mockReturnValue('/tmp/logs/stex.log');
+    mockExistsSync.mockReturnValue(false);
+    const handler = mockHandlers.get(IpcChannels.LOG_REVEAL)!;
+    await handler({});
+    expect(mockShell.showItemInFolder).not.toHaveBeenCalled();
+    expect(mockShell.openPath).toHaveBeenCalledWith('/tmp/logs');
+  });
+
+  it('LOG_REVEAL handler is a no-op when log path is null', async () => {
+    registerSettingsIpc();
+    mockGetLogFilePath.mockReturnValue(null);
+    const handler = mockHandlers.get(IpcChannels.LOG_REVEAL)!;
+    await handler({});
+    expect(mockShell.showItemInFolder).not.toHaveBeenCalled();
+    expect(mockShell.openPath).not.toHaveBeenCalled();
   });
 
   it('SETTINGS_GET handler returns masked sonioxApiKey', async () => {

@@ -1,7 +1,10 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import Store from 'electron-store';
-import { ipcMain, BrowserWindow, safeStorage } from 'electron';
+import { ipcMain, BrowserWindow, safeStorage, shell } from 'electron';
 import { AppSettings } from '../shared/types';
 import { IpcChannels } from '../shared/ipc';
+import { getLogFilePath } from './logger';
 
 /**
  * Resolves the effective Soniox API key using precedence rules:
@@ -96,6 +99,18 @@ export function setSetting<K extends keyof AppSettings>(key: K, value: AppSettin
 
 export function registerSettingsIpc(): void {
   ipcMain.handle(IpcChannels.SETTINGS_GET, () => getSettingsForRenderer());
+
+  ipcMain.handle(IpcChannels.LOG_PATH_GET, () => getLogFilePath());
+
+  ipcMain.handle(IpcChannels.LOG_REVEAL, () => {
+    const logPath = getLogFilePath();
+    if (!logPath) return;
+    if (fs.existsSync(logPath)) {
+      shell.showItemInFolder(logPath);
+    } else {
+      shell.openPath(path.dirname(logPath));
+    }
+  });
 
   ipcMain.handle(IpcChannels.SETTINGS_SET, (_event, key: string, value: unknown) => {
     if (!VALID_KEYS.has(key as keyof AppSettings)) {

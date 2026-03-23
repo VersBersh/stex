@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { initLogger, debug, info, warn, error } from './logger';
+import { initLogger, debug, info, warn, error, getLogFilePath } from './logger';
 
 function createTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'stex-logger-test-'));
@@ -140,6 +140,20 @@ describe('logger', () => {
       error('test error');
 
       expect(spy).toHaveBeenCalledTimes(2);
+      spy.mockRestore();
+    });
+  });
+
+  describe('getLogFilePath', () => {
+    it('returns the log file path after successful initialization', () => {
+      initLogger({ logDir });
+      expect(getLogFilePath()).toBe(path.join(logDir, 'stex.log'));
+    });
+
+    it('returns null in console-only mode (failed init)', () => {
+      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      initLogger({ logDir: path.join(logDir, '\0invalid') });
+      expect(getLogFilePath()).toBeNull();
       spy.mockRestore();
     });
   });

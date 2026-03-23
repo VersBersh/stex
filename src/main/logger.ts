@@ -69,6 +69,10 @@ function log(level: LogLevel, message: string, ...args: unknown[]): void {
   }
 }
 
+export function getLogFilePath(): string | null {
+  return logFile;
+}
+
 export function debug(message: string, ...args: unknown[]): void {
   log('debug', message, ...args);
 }

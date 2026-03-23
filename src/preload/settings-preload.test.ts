@@ -82,6 +82,29 @@ describe('Settings preload bridge', () => {
       await api.getResolvedTheme();
       expect(mockInvoke).toHaveBeenCalledWith('theme:get');
     });
+
+    it('exposes getLogPath', () => {
+      const api = exposed.settingsApi as Record<string, (...args: unknown[]) => unknown>;
+      expect(typeof api.getLogPath).toBe('function');
+    });
+
+    it('getLogPath calls ipcRenderer.invoke with correct channel', async () => {
+      const api = exposed.settingsApi as Record<string, (...args: unknown[]) => unknown>;
+      mockInvoke.mockResolvedValue('/tmp/logs/stex.log');
+      await api.getLogPath();
+      expect(mockInvoke).toHaveBeenCalledWith('log:get-path');
+    });
+
+    it('exposes revealLogFile', () => {
+      const api = exposed.settingsApi as Record<string, (...args: unknown[]) => unknown>;
+      expect(typeof api.revealLogFile).toBe('function');
+    });
+
+    it('revealLogFile calls ipcRenderer.invoke with correct channel', async () => {
+      const api = exposed.settingsApi as Record<string, (...args: unknown[]) => unknown>;
+      await api.revealLogFile();
+      expect(mockInvoke).toHaveBeenCalledWith('log:reveal');
+    });
   });
 
   describe('listener methods (Main → Renderer, push events)', () => {

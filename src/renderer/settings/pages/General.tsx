@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { AppSettings } from '../../../shared/types';
 
 interface Props {
@@ -8,6 +8,16 @@ interface Props {
 }
 
 export function General({ settings, onSettingChange, audioDevices }: Props) {
+  const [logPath, setLogPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    window.settingsApi.getLogPath().then(setLogPath);
+  }, []);
+
+  const handleRevealLog = useCallback(() => {
+    window.settingsApi.revealLogFile();
+  }, []);
+
   return (
     <div>
       <h2>General</h2>
@@ -121,6 +131,16 @@ export function General({ settings, onSettingChange, audioDevices }: Props) {
         <p className="hint">
           Controls how quickly speech is finalized. Lower values finalize faster but may split words.
         </p>
+      </div>
+      <div className="setting-group">
+        <label>Log File</label>
+        <div className="log-path-row">
+          <code className="log-path">{logPath ?? 'Not available'}</code>
+          <button type="button" className="btn" onClick={handleRevealLog} disabled={!logPath}>
+            Show in folder
+          </button>
+        </div>
+        <p className="hint">Application log file for troubleshooting.</p>
       </div>
     </div>
   );

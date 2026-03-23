@@ -37,6 +37,8 @@ export interface SettingsAPI {
   getAudioDevices(): Promise<string[]>;
   getResolvedTheme(): Promise<"light" | "dark">;
   onThemeChanged(callback: (theme: "light" | "dark") => void): () => void;
+  getLogPath(): Promise<string | null>;
+  revealLogFile(): Promise<void>;
 }
 
 declare global {
