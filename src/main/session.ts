@@ -5,7 +5,7 @@ import { flashTrayIcon } from './tray';
 import { IpcChannels } from '../shared/ipc';
 import type { SessionState, SonioxToken, ErrorInfo } from '../shared/types';
 import { registerSessionIpc } from './session-ipc';
-import { connectSoniox, finalizeSoniox, isConnected, resumeCapture, cancelReconnect, resetLifecycle } from './soniox-lifecycle';
+import { connectSoniox, finalizeSoniox, isConnected, hasPendingNonFinalTokens, resumeCapture, cancelReconnect, resetLifecycle } from './soniox-lifecycle';
 import { sendToRenderer, sendStatus, sendError, clearError } from './renderer-send';
 import { copyEditorTextToClipboard } from './session-clipboard';
 import { info, warn } from './logger';
@@ -117,7 +117,7 @@ async function stopSession(): Promise<void> {
 
   stopCapture();
 
-  if (isConnected()) {
+  if (isConnected() && hasPendingNonFinalTokens()) {
     finalizeSoniox();
     await waitForFinalization();
   }

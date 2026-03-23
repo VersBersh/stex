@@ -29,6 +29,7 @@ const {
     finalize: vi.fn(),
     disconnect: vi.fn(),
     connected: false,
+    hasPendingNonFinalTokens: true,
     _events: {} as Record<string, (...args: unknown[]) => void>,
   };
 
@@ -42,6 +43,7 @@ const {
       mockSonioxInstance.connected = false;
     }
     get connected() { return mockSonioxInstance.connected; }
+    get hasPendingNonFinalTokens() { return mockSonioxInstance.hasPendingNonFinalTokens; }
     connect(...args: unknown[]) { return mockSonioxInstance.connect(...args); }
     sendAudio(...args: unknown[]) { return mockSonioxInstance.sendAudio(...args); }
     finalize(...args: unknown[]) { return mockSonioxInstance.finalize(...args); }
@@ -187,6 +189,7 @@ describe('Session Manager', () => {
     mockOverlayWindow.webContents.send.mockClear();
     mockSonioxInstance._events = {};
     mockSonioxInstance.connected = false;
+    mockSonioxInstance.hasPendingNonFinalTokens = true;
     mockSettingsData.onHide = 'clipboard';
     mockSettingsData.onShow = 'fresh';
     mockSettingsData.sonioxApiKey = 'test-key';
@@ -518,6 +521,43 @@ describe('Session Manager', () => {
         );
       });
     });
+
+    it('skips finalization when no non-final tokens pending', async () => {
+      mockSettingsData.onHide = 'none';
+      mockSonioxInstance.hasPendingNonFinalTokens = false;
+
+      requestToggle(); // stop
+
+      // finalize should NOT be called
+      expect(mockSonioxInstance.finalize).not.toHaveBeenCalled();
+
+      // stop should complete immediately without needing onFinished
+      await vi.waitFor(() => {
+        expect(mockHideOverlay).toHaveBeenCalled();
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_STATUS,
+          'idle',
+        );
+      });
+    });
+
+    it('proceeds with finalization when non-final tokens are pending', async () => {
+      mockSettingsData.onHide = 'none';
+      mockSonioxInstance.hasPendingNonFinalTokens = true;
+
+      requestToggle(); // stop
+
+      expect(mockSonioxInstance.finalize).toHaveBeenCalled();
+
+      // Should not complete until onFinished fires
+      expect(mockHideOverlay).not.toHaveBeenCalled();
+
+      triggerOnFinished();
+
+      await vi.waitFor(() => {
+        expect(mockHideOverlay).toHaveBeenCalled();
+      });
+    });
   });
 
   describe('stop from paused state', () => {
@@ -544,6 +584,22 @@ describe('Session Manager', () => {
       requestToggle();
       triggerOnFinished();
 
+      await vi.waitFor(() => {
+        expect(mockSonioxInstance.disconnect).toHaveBeenCalled();
+        expect(mockHideOverlay).toHaveBeenCalled();
+      });
+    });
+
+    it('skips redundant finalization when no non-final tokens pending after pause', async () => {
+      mockSettingsData.onHide = 'none';
+      mockSonioxInstance.hasPendingNonFinalTokens = false;
+
+      requestToggle(); // stop from paused
+
+      // finalize should NOT be called again (was already called during pause)
+      expect(mockSonioxInstance.finalize).not.toHaveBeenCalled();
+
+      // Should complete immediately without onFinished
       await vi.waitFor(() => {
         expect(mockSonioxInstance.disconnect).toHaveBeenCalled();
         expect(mockHideOverlay).toHaveBeenCalled();

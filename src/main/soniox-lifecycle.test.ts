@@ -9,6 +9,7 @@ const { mockSonioxInstance, MockSonioxClient, mockAudio, mockSettingsData } = vi
     finalize: vi.fn(),
     disconnect: vi.fn(),
     connected: false,
+    hasPendingNonFinalTokens: true,
     _events: {} as Record<string, (...args: unknown[]) => void>,
   };
 
@@ -22,6 +23,7 @@ const { mockSonioxInstance, MockSonioxClient, mockAudio, mockSettingsData } = vi
       mockSonioxInstance.connected = false;
     }
     get connected() { return mockSonioxInstance.connected; }
+    get hasPendingNonFinalTokens() { return mockSonioxInstance.hasPendingNonFinalTokens; }
     connect(...args: unknown[]) { return mockSonioxInstance.connect(...args); }
     sendAudio(...args: unknown[]) { return mockSonioxInstance.sendAudio(...args); }
     finalize(...args: unknown[]) { return mockSonioxInstance.finalize(...args); }

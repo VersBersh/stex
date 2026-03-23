@@ -23,6 +23,10 @@ export function isConnected(): boolean {
   return soniox?.connected ?? false;
 }
 
+export function hasPendingNonFinalTokens(): boolean {
+  return soniox?.hasPendingNonFinalTokens ?? false;
+}
+
 export function finalizeSoniox(): void {
   debug('Finalization sent');
   soniox?.finalize();

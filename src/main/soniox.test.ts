@@ -500,6 +500,95 @@ describe('SonioxClient', () => {
     });
   });
 
+  describe('hasPendingNonFinalTokens', () => {
+    it('is true by default before any messages arrive', async () => {
+      client.connect(makeSettings());
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      expect(client.hasPendingNonFinalTokens).toBe(true);
+    });
+
+    it('is true after receiving a response with non-final tokens', async () => {
+      client.connect(makeSettings());
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+      socket.emit(
+        'message',
+        makeResponse(
+          [{ text: 'hel', start_ms: 0, end_ms: 200, confidence: 0.7, is_final: false }],
+          0,
+          200,
+        ),
+      );
+
+      expect(client.hasPendingNonFinalTokens).toBe(true);
+    });
+
+    it('is false after receiving a response with only final tokens', async () => {
+      client.connect(makeSettings());
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+      socket.emit(
+        'message',
+        makeResponse(
+          [{ text: 'hello', start_ms: 0, end_ms: 300, confidence: 0.95, is_final: true }],
+          300,
+          300,
+        ),
+      );
+
+      expect(client.hasPendingNonFinalTokens).toBe(false);
+    });
+
+    it('resets to true on new connect()', async () => {
+      client.connect(makeSettings());
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      // Get to false state
+      const socket = lastCreatedSocket()!;
+      socket.emit(
+        'message',
+        makeResponse(
+          [{ text: 'done', start_ms: 0, end_ms: 200, confidence: 0.95, is_final: true }],
+          200,
+          200,
+        ),
+      );
+      expect(client.hasPendingNonFinalTokens).toBe(false);
+
+      // Reconnect should reset to true
+      client.connect(makeSettings());
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalledTimes(2));
+
+      expect(client.hasPendingNonFinalTokens).toBe(true);
+    });
+
+    it('is not updated by token-less responses', async () => {
+      client.connect(makeSettings());
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+
+      // First set to false via all-final response
+      socket.emit(
+        'message',
+        makeResponse(
+          [{ text: 'done', start_ms: 0, end_ms: 200, confidence: 0.95, is_final: true }],
+          200,
+          200,
+        ),
+      );
+      expect(client.hasPendingNonFinalTokens).toBe(false);
+
+      // Response with no tokens property at all (triggers early return in handleMessage)
+      socket.emit('message', JSON.stringify({ final_audio_proc_ms: 0, total_audio_proc_ms: 0 }));
+
+      // Should remain false — not updated by token-less response
+      expect(client.hasPendingNonFinalTokens).toBe(false);
+    });
+  });
   describe('message data handling', () => {
     it('handles Buffer message data', async () => {
       client.connect(makeSettings());

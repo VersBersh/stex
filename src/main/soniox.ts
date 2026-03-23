@@ -34,6 +34,7 @@ export interface SonioxClientEvents {
 export class SonioxClient {
   private ws: WebSocket | null = null;
   private lastFinalProcMs = 0;
+  private _hasPendingNonFinalTokens = true;
   private events: Partial<SonioxClientEvents>;
 
   constructor(events: Partial<SonioxClientEvents>) {
@@ -44,12 +45,17 @@ export class SonioxClient {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
+  get hasPendingNonFinalTokens(): boolean {
+    return this._hasPendingNonFinalTokens;
+  }
+
   connect(settings: AppSettings): void {
     if (this.ws) {
       this.disconnect();
     }
 
     this.lastFinalProcMs = 0;
+    this._hasPendingNonFinalTokens = true;
     info('Soniox WebSocket connecting to %s', SONIOX_ENDPOINT);
     const socket = new WebSocket(SONIOX_ENDPOINT);
     this.ws = socket;
@@ -135,6 +141,8 @@ export class SonioxClient {
       (t) => t.is_final && t.start_ms >= this.lastFinalProcMs,
     );
     const nonFinalTokens = contentTokens.filter((t) => !t.is_final);
+
+    this._hasPendingNonFinalTokens = nonFinalTokens.length > 0;
 
     if (newFinalTokens.length > 0) {
       this.events.onFinalTokens?.(newFinalTokens);
