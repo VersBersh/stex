@@ -28,7 +28,7 @@ Stream microphone audio to the Soniox WebSocket API and display transcribed text
 - Session enters `"finalizing"` state:
   1. Mic capture stops
   2. An empty audio frame is sent to Soniox to trigger finalization
-  3. App waits for the `finished: true` response (may take a moment on slow connections)
+  3. App waits for the `finished: true` response, subject to a 5-second timeout (see [api.md — Manual Finalization](../api.md#manual-finalization)). If the timeout expires, the app proceeds anyway.
   4. Finalized tokens are committed as normal, ghost text is removed
   5. Full document text is copied to clipboard (if non-empty)
   6. Window hides

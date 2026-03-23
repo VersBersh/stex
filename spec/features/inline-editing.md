@@ -82,7 +82,7 @@ Pause is a single, well-defined state transition:
 
 1. **Mic capture stops** — no more audio is sent to Soniox
 2. **An empty audio frame is sent** to Soniox to trigger server-side finalization of any pending non-final tokens
-3. **Wait for `finished: true`** — the app waits for Soniox to return the finalized response (this may take longer on slow connections, which is fine)
+3. **Wait for `finished: true`** — the app waits for Soniox to return the finalized response, subject to a 5-second timeout (see [api.md — Manual Finalization](../api.md#manual-finalization)). If the timeout expires, the app proceeds to the paused state anyway (the WebSocket remains open, so late-arriving final tokens may still be delivered).
 4. **Commit finalized tokens** — finalized tokens are committed as normal
 5. **Ghost text is removed** — ghost text is cleared from the display
 6. **Session state transitions to `"paused"`** — the WebSocket connection remains open

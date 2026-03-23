@@ -247,7 +247,7 @@ On a non-reconnectable disconnect:
 
 ## Manual Finalization
 
-Finalization sends an empty binary frame to signal end-of-utterance. The server will finalize remaining tokens and respond with `finished: true`. The client waits for this response before proceeding, with a timeout to prevent hangs (proceeds anyway if the server does not respond in time).
+Finalization sends an empty binary frame to signal end-of-utterance. The server will finalize remaining tokens and respond with `finished: true`. The client waits for this response before proceeding, with a **5-second timeout** to prevent hangs. If the timeout expires, the client proceeds anyway (graceful degradation).
 
 **On pause**: Always sends finalization. After finalization completes, clear ghost text and enter the paused state. The WebSocket remains open for resume.
 
