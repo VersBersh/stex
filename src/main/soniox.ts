@@ -49,12 +49,14 @@ export class SonioxClient {
       const config = {
         api_key: settings.sonioxApiKey,
         model: settings.sonioxModel,
-        audio_format: 's16le',
+        audio_format: 'pcm_s16le',
         sample_rate: 16000,
         num_channels: 1,
         language_hints: [settings.language],
         max_endpoint_delay_ms: settings.maxEndpointDelayMs,
       };
+      debug('Soniox config: model=%s, language=%s, max_endpoint_delay_ms=%d',
+        config.model, config.language_hints[0], config.max_endpoint_delay_ms);
       socket.send(JSON.stringify(config));
       this.events.onConnected?.();
     });
@@ -66,7 +68,7 @@ export class SonioxClient {
 
     socket.on('close', (code: number, reason: Buffer) => {
       if (socket !== this.ws) return;
-      info('Soniox WebSocket closed (code=%d)', code);
+      info('Soniox WebSocket closed (code=%d, reason=%s)', code, reason.toString() || '(none)');
       this.events.onDisconnected?.(code, reason.toString());
     });
 

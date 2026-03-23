@@ -23,7 +23,7 @@ export const APP_SETTINGS_DEFAULTS: AppSettings = {
   onShow: 'fresh',
   audioInputDevice: null,
   sonioxApiKey: '',
-  sonioxModel: 'stt-rt-preview',
+  sonioxModel: 'stt-rt-v4',
   language: 'en',
   maxEndpointDelayMs: 1000,
   theme: 'system',

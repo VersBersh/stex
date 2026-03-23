@@ -115,7 +115,7 @@ describe('SonioxClient', () => {
       expect(configMsg).toEqual({
         api_key: 'my-api-key',
         model: 'stt-rt-preview',
-        audio_format: 's16le',
+        audio_format: 'pcm_s16le',
         sample_rate: 16000,
         num_channels: 1,
         language_hints: ['en'],
