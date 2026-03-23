@@ -1,0 +1,9 @@
+- **Verdict** — `Approved`
+
+- **Progress**
+  - [x] Done — Update `SessionState.status` in [spec/models.md](C:/code/draftable/stex/.mound/worktrees/worker-7-553e66d7/spec/models.md#L95) to include `"disconnected"` and `"reconnecting"`, matching the authoritative union in [src/shared/types.ts](C:/code/draftable/stex/.mound/worktrees/worker-7-553e66d7/src/shared/types.ts#L38).
+
+- **Issues**
+  - None. The implementation is narrowly scoped, matches the single plan step exactly, and the resulting spec now aligns with the authoritative type definition in [src/shared/types.ts](C:/code/draftable/stex/.mound/worktrees/worker-7-553e66d7/src/shared/types.ts#L38) and the architecture spec in [spec/architecture.md](C:/code/draftable/stex/.mound/worktrees/worker-7-553e66d7/spec/architecture.md#L124).
+
+The diff only changes [spec/models.md](C:/code/draftable/stex/.mound/worktrees/worker-7-553e66d7/spec/models.md#L95), with no unplanned edits. I checked the surrounding dependents and callers: runtime/test/UI code already reference `reconnecting` and `disconnected` in multiple places, including [src/main/soniox-lifecycle.ts](C:/code/draftable/stex/.mound/worktrees/worker-7-553e66d7/src/main/soniox-lifecycle.ts#L57), [src/main/session.ts](C:/code/draftable/stex/.mound/worktrees/worker-7-553e66d7/src/main/session.ts#L203), [src/renderer/overlay/components/StatusBar.tsx](C:/code/draftable/stex/.mound/worktrees/worker-7-553e66d7/src/renderer/overlay/components/StatusBar.tsx#L10), and the reconnect tests in [src/main/session.test.ts](C:/code/draftable/stex/.mound/worktrees/worker-7-553e66d7/src/main/session.test.ts#L562). The remaining disconnect-flow inconsistencies noted in the task files are pre-existing and out of scope for this documentation-alignment change.
