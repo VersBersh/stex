@@ -112,9 +112,11 @@ async function pauseSession(): Promise<void> {
   status = 'paused';
 
   stopCapture();
-  finalizeSoniox();
 
-  await waitForFinalization();
+  if (isConnected() && hasPendingNonFinalTokens()) {
+    finalizeSoniox();
+    await waitForFinalization();
+  }
 
   sendToRenderer(IpcChannels.TOKENS_NONFINAL, []);
   sendToRenderer(IpcChannels.SESSION_PAUSED);

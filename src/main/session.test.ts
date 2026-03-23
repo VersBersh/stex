@@ -328,10 +328,40 @@ describe('Session Manager', () => {
       expect(mockAudio.stopCapture).toHaveBeenCalled();
     });
 
-    it('sends finalize to Soniox on pause', () => {
+    it('sends finalize to Soniox on pause when non-final tokens are pending', () => {
       triggerPauseIpc();
 
       expect(mockSonioxInstance.finalize).toHaveBeenCalled();
+    });
+
+    it('skips finalization on pause when no non-final tokens pending', async () => {
+      mockSonioxInstance.hasPendingNonFinalTokens = false;
+
+      triggerPauseIpc();
+
+      expect(mockSonioxInstance.finalize).not.toHaveBeenCalled();
+
+      // Should complete immediately without needing onFinished
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_PAUSED,
+        );
+      });
+    });
+
+    it('skips finalization on pause when not connected', async () => {
+      mockSonioxInstance.connected = false;
+
+      triggerPauseIpc();
+
+      expect(mockSonioxInstance.finalize).not.toHaveBeenCalled();
+
+      // Should complete immediately without needing onFinished
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_PAUSED,
+        );
+      });
     });
 
     it('waits for finalization before sending SESSION_PAUSED IPC', async () => {
