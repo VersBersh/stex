@@ -90,6 +90,7 @@ export class SonioxClient {
     debug('Soniox WebSocket disconnect requested');
     if (this.ws) {
       this.ws.removeAllListeners();
+      this.ws.on('error', () => {}); // Swallow errors during close
       this.ws.close();
       this.ws = null;
     }
