@@ -3,6 +3,7 @@ import { SonioxToken, AppSettings } from '../shared/types';
 import { info, debug, error as logError } from './logger';
 
 const SONIOX_ENDPOINT = 'wss://stt-rt.soniox.com/transcribe-websocket';
+const MAX_CONTEXT_CHARS = 9000;
 
 function isEndpointMarker(token: SonioxToken): boolean {
   return token.text === '<end>';
@@ -49,7 +50,7 @@ export class SonioxClient {
     return this._hasPendingNonFinalTokens;
   }
 
-  connect(settings: AppSettings): void {
+  connect(settings: AppSettings, contextText?: string): void {
     if (this.ws) {
       this.disconnect();
     }
@@ -63,6 +64,14 @@ export class SonioxClient {
     socket.on('open', () => {
       if (socket !== this.ws) return;
       debug('Soniox WebSocket connected');
+      let trimmedContext: string | undefined;
+      if (contextText) {
+        trimmedContext = contextText.length > MAX_CONTEXT_CHARS
+          ? contextText.slice(-MAX_CONTEXT_CHARS)
+          : contextText;
+        debug('Soniox context: %d chars (trimmed from %d)', trimmedContext.length, contextText.length);
+      }
+
       const config = {
         api_key: settings.sonioxApiKey,
         model: settings.sonioxModel,
@@ -72,7 +81,9 @@ export class SonioxClient {
         language_hints: [settings.language],
         enable_endpoint_detection: true,
         max_endpoint_delay_ms: settings.maxEndpointDelayMs,
+        ...(trimmedContext ? { context: { text: trimmedContext } } : {}),
       };
+
       debug('Soniox config: model=%s, language=%s, max_endpoint_delay_ms=%d',
         config.model, config.language_hints[0], config.max_endpoint_delay_ms);
       socket.send(JSON.stringify(config));

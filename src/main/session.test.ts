@@ -239,6 +239,7 @@ describe('Session Manager', () => {
 
       expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
         expect.objectContaining({ sonioxApiKey: 'test-key' }),
+        undefined,
       );
     });
 
@@ -926,15 +927,117 @@ describe('Session Manager', () => {
       );
     });
 
-    it('sends onShow: append when configured', () => {
+    it('sends onShow: append when configured', async () => {
       mockSettingsData.onShow = 'append';
       mockOverlayWindow.isVisible.mockReturnValue(false);
       requestToggle();
 
-      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
-        IpcChannels.SESSION_START,
-        'append',
+      // Simulate renderer responding to context request
+      await vi.waitFor(() => {
+        expect(mockIpcMainHandlers.has(IpcChannels.SESSION_CONTEXT)).toBe(true);
+      });
+      const textHandler = mockIpcMainHandlers.get(IpcChannels.SESSION_CONTEXT)!;
+      textHandler({}, '');
+
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_START,
+          'append',
+        );
+      });
+    });
+  });
+
+  describe('context support', () => {
+    it('passes editor text as context in append mode', async () => {
+      mockSettingsData.onShow = 'append';
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+      requestToggle();
+
+      // Simulate renderer responding with existing text
+      await vi.waitFor(() => {
+        expect(mockIpcMainHandlers.has(IpcChannels.SESSION_CONTEXT)).toBe(true);
+      });
+      const textHandler = mockIpcMainHandlers.get(IpcChannels.SESSION_CONTEXT)!;
+      textHandler({}, 'existing text before cursor');
+
+      await vi.waitFor(() => {
+        expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+          expect.objectContaining({ sonioxApiKey: 'test-key' }),
+          'existing text before cursor',
+        );
+      });
+    });
+
+    it('skips context fetch in fresh mode', () => {
+      mockSettingsData.onShow = 'fresh';
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+      requestToggle();
+
+      // Should NOT have sent a SESSION_CONTEXT request
+      const sendCalls = mockOverlayWindow.webContents.send.mock.calls;
+      const contextRequestCalls = sendCalls.filter(
+        (call: unknown[]) => call[0] === IpcChannels.SESSION_CONTEXT,
       );
+      expect(contextRequestCalls).toHaveLength(0);
+
+      // SonioxClient.connect should have been called without context
+      expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+        expect.objectContaining({ sonioxApiKey: 'test-key' }),
+        undefined,
+      );
+    });
+
+    it('proceeds without context on timeout', async () => {
+      vi.useFakeTimers();
+
+      mockSettingsData.onShow = 'append';
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+      requestToggle();
+
+      // Don't respond to context request — let it time out
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+        expect.objectContaining({ sonioxApiKey: 'test-key' }),
+        undefined,
+      );
+
+      vi.useRealTimers();
+    });
+
+    it('requests context text before sending SESSION_START in append mode', async () => {
+      mockSettingsData.onShow = 'append';
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+      requestToggle();
+
+      // SESSION_CONTEXT request should have been sent
+      const sendCalls = mockOverlayWindow.webContents.send.mock.calls;
+      const contextRequestCalls = sendCalls.filter(
+        (call: unknown[]) => call[0] === IpcChannels.SESSION_CONTEXT,
+      );
+      expect(contextRequestCalls).toHaveLength(1);
+
+      // SESSION_START should NOT have been sent yet (waiting for context response)
+      const startCalls = sendCalls.filter(
+        (call: unknown[]) => call[0] === IpcChannels.SESSION_START,
+      );
+      expect(startCalls).toHaveLength(0);
+
+      // Respond with text
+      await vi.waitFor(() => {
+        expect(mockIpcMainHandlers.has(IpcChannels.SESSION_CONTEXT)).toBe(true);
+      });
+      const textHandler = mockIpcMainHandlers.get(IpcChannels.SESSION_CONTEXT)!;
+      textHandler({}, 'context text');
+
+      // Now SESSION_START should have been sent
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_START,
+          'append',
+        );
+      });
     });
   });
 });

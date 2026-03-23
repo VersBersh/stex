@@ -1,0 +1,1 @@
+No struggles. The conflict was a simple textual conflict in `spec/api.md` where task 103 had added a description line about configurable model settings, and the incoming commit added a new Context section immediately after. Both additions were kept in order.

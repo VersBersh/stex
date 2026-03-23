@@ -119,6 +119,7 @@ describe('soniox-lifecycle', () => {
 
       expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
         expect.objectContaining({ sonioxApiKey: 'test-key' }),
+        undefined,
       );
     });
 
@@ -295,6 +296,72 @@ describe('soniox-lifecycle', () => {
 
       vi.advanceTimersByTime(60000);
       expect(mockSonioxInstance.connect).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe('context support', () => {
+    it('passes contextText to SonioxClient.connect', () => {
+      connectSoniox(createMockCallbacks(), 'hello world');
+
+      expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+        expect.objectContaining({ sonioxApiKey: 'test-key' }),
+        'hello world',
+      );
+    });
+
+    it('passes undefined when no contextText provided', () => {
+      connectSoniox(createMockCallbacks());
+
+      expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+        expect.objectContaining({ sonioxApiKey: 'test-key' }),
+        undefined,
+      );
+    });
+
+    it('reuses stored contextText on reconnect', () => {
+      vi.useFakeTimers();
+
+      connectSoniox(createMockCallbacks(), 'stored context');
+      triggerOnConnected();
+      mockSonioxInstance.connect.mockClear();
+
+      triggerOnDisconnected(1006, 'connection lost');
+
+      vi.advanceTimersByTime(1000);
+
+      expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+        expect.objectContaining({ sonioxApiKey: 'test-key' }),
+        'stored context',
+      );
+
+      vi.useRealTimers();
+    });
+
+    it('clears stored contextText on resetLifecycle', () => {
+      vi.useFakeTimers();
+
+      connectSoniox(createMockCallbacks(), 'some context');
+      triggerOnConnected();
+      triggerOnDisconnected(1006, 'connection lost');
+
+      resetLifecycle();
+
+      // Now start a new session without context
+      connectSoniox(createMockCallbacks());
+      triggerOnConnected();
+      mockSonioxInstance.connect.mockClear();
+
+      triggerOnDisconnected(1006, 'connection lost');
+
+      vi.advanceTimersByTime(1000);
+
+      // Should reconnect without context since we reset and reconnected without it
+      expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+        expect.objectContaining({ sonioxApiKey: 'test-key' }),
+        undefined,
+      );
 
       vi.useRealTimers();
     });

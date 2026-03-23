@@ -174,6 +174,21 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Respond to main process context text requests for Soniox context
+  useEffect(() => {
+    return window.api.onRequestContextText(() => {
+      const editor = editorRef.current;
+      if (!editor) {
+        window.api.sendContextText('');
+        return;
+      }
+      editor.getEditorState().read(() => {
+        const text = $getDocumentText();
+        window.api.sendContextText(text);
+      });
+    });
+  }, []);
+
 
   // Window-level keyboard shortcuts
   useEffect(() => {

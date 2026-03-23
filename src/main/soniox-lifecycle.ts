@@ -18,6 +18,7 @@ let soniox: SonioxClient | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempt = 0;
 let activeCallbacks: SonioxLifecycleCallbacks | null = null;
+let storedContextText: string | null = null;
 
 export function isConnected(): boolean {
   return soniox?.connected ?? false;
@@ -49,6 +50,7 @@ export function resetLifecycle(): void {
   cancelReconnect();
   soniox?.disconnect();
   soniox = null;
+  storedContextText = null;
 }
 
 function scheduleReconnect(): void {
@@ -108,8 +110,9 @@ export function resumeCapture(): void {
   }
 }
 
-export function connectSoniox(callbacks: SonioxLifecycleCallbacks): void {
+export function connectSoniox(callbacks: SonioxLifecycleCallbacks, contextText?: string): void {
   activeCallbacks = callbacks;
+  storedContextText = contextText ?? null;
   const settings = getSettings();
   const keyLen = settings.sonioxApiKey.length;
   const keyPreview = keyLen > 4 ? settings.sonioxApiKey.slice(0, 4) + '...' : '(empty)';
@@ -151,7 +154,7 @@ export function connectSoniox(callbacks: SonioxLifecycleCallbacks): void {
     },
   });
 
-  soniox.connect(settings);
+  soniox.connect(settings, contextText);
 }
 
 function attemptReconnect(): void {
@@ -190,5 +193,5 @@ function attemptReconnect(): void {
     },
   });
 
-  soniox.connect(settings);
+  soniox.connect(settings, storedContextText ?? undefined);
 }

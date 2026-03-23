@@ -11,6 +11,7 @@ Stream microphone audio to the Soniox WebSocket API and display transcribed text
 - User presses the global hotkey to show the window
 - Microphone capture begins (or resumes if pre-connected)
 - A WebSocket connection to Soniox is established (or already open if kept alive)
+- When starting with existing text (append mode), the preceding editor text is sent as context to Soniox to improve transcription continuity
 - Audio frames are streamed continuously to Soniox
 
 ### Token Flow

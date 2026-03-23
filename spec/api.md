@@ -31,6 +31,27 @@ First message on the WebSocket must be a JSON configuration:
 
 `model` is configurable via settings; `stt-rt-v4` is the current default. `language_hints` and `max_endpoint_delay_ms` are also configurable.
 
+### Context (Optional)
+
+When the editor contains existing text (e.g., when starting with `onShow: 'append'`), a `context` object is included in the configuration message to help Soniox produce more accurate transcription as a continuation of the existing text:
+
+```json
+{
+  "api_key": "...",
+  "model": "stt-rt-preview",
+  "context": {
+    "text": "The preceding editor text goes here..."
+  },
+  "audio_format": "pcm_s16le",
+  ...
+}
+```
+
+- `context.text`: The text currently in the editor before the new dictation begins
+- Maximum ~10,000 characters (Soniox limit of 8,000 tokens); the implementation drops the oldest prefix and keeps the most recent 9,000 characters
+- Only included when there is non-empty editor text at session start
+- On reconnect within the same session, the context from the initial connect is reused
+
 ### Audio Streaming
 
 After configuration, send raw audio as binary WebSocket frames. Audio should be:

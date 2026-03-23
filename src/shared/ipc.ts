@@ -7,6 +7,7 @@ export const IpcChannels = {
   TOKENS_NONFINAL: 'tokens:nonfinal',
   SESSION_STATUS: 'session:status',
   SESSION_TEXT: 'session:text',
+  SESSION_CONTEXT: 'session:context',
   SESSION_REQUEST_PAUSE: 'session:request-pause',
   SESSION_REQUEST_RESUME: 'session:request-resume',
   SETTINGS_GET: 'settings:get',

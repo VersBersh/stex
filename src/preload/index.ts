@@ -19,6 +19,7 @@ const api: ElectronAPI = {
   sessionRequestPause: () => ipcRenderer.send(IpcChannels.SESSION_REQUEST_PAUSE),
   sessionRequestResume: () => ipcRenderer.send(IpcChannels.SESSION_REQUEST_RESUME),
   sendSessionText: (text: string) => ipcRenderer.send(IpcChannels.SESSION_TEXT, text),
+  sendContextText: (text: string) => ipcRenderer.send(IpcChannels.SESSION_CONTEXT, text),
   hideWindow: () => ipcRenderer.send(IpcChannels.WINDOW_HIDE),
   escapeHide: () => ipcRenderer.send(IpcChannels.WINDOW_ESCAPE_HIDE),
   openSettings: () => ipcRenderer.send(IpcChannels.SESSION_OPEN_SETTINGS),
@@ -65,6 +66,11 @@ const api: ElectronAPI = {
     const handler = () => callback();
     ipcRenderer.on(IpcChannels.SESSION_TEXT, handler);
     return () => { ipcRenderer.removeListener(IpcChannels.SESSION_TEXT, handler); };
+  },
+  onRequestContextText: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on(IpcChannels.SESSION_CONTEXT, handler);
+    return () => { ipcRenderer.removeListener(IpcChannels.SESSION_CONTEXT, handler); };
   },
   onSettingsUpdated: (callback: (settings: AppSettings) => void) => {
     const handler = (_event: unknown, settings: AppSettings) => callback(settings);

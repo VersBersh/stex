@@ -11,6 +11,7 @@ export interface ElectronAPI {
   sessionRequestPause(): void;
   sessionRequestResume(): void;
   sendSessionText(text: string): void;
+  sendContextText(text: string): void;
   hideWindow(): void;
   escapeHide(): void;
   openSettings(): void;
@@ -27,6 +28,7 @@ export interface ElectronAPI {
   onSessionStatus(callback: (status: SessionState['status']) => void): () => void;
   onSettingsUpdated(callback: (settings: AppSettings) => void): () => void;
   onRequestSessionText(callback: () => void): () => void;
+  onRequestContextText(callback: () => void): () => void;
   onThemeChanged(callback: (theme: 'light' | 'dark') => void): () => void;
   onSessionError(callback: (error: ErrorInfo | null) => void): () => void;
 }

@@ -1,3 +1,4 @@
+import { ipcMain } from 'electron';
 import { stopCapture } from './audio';
 import { getOverlayWindow, showOverlay, hideOverlay, setOverlayCloseHandler } from './window';
 import { getSettings } from './settings';
@@ -11,6 +12,7 @@ import { copyEditorTextToClipboard } from './session-clipboard';
 import { info, warn } from './logger';
 
 const FINALIZATION_TIMEOUT_MS = 5000;
+const CONTEXT_FETCH_TIMEOUT_MS = 500;
 let status: SessionState['status'] = 'idle';
 let activeTransition: Promise<void> | null = null;
 let currentFinalizationResolver: (() => void) | null = null;
@@ -62,7 +64,25 @@ function createLifecycleCallbacks() {
   };
 }
 
-function startSession(): void {
+function getEditorContextText(): Promise<string> {
+  return new Promise<string>((resolve) => {
+    const handler = (_event: unknown, text: string) => {
+      clearTimeout(timer);
+      resolve(text || '');
+    };
+
+    const timer = setTimeout(() => {
+      ipcMain.removeListener(IpcChannels.SESSION_CONTEXT, handler);
+      warn('Context fetch timed out after %dms, proceeding without context', CONTEXT_FETCH_TIMEOUT_MS);
+      resolve('');
+    }, CONTEXT_FETCH_TIMEOUT_MS);
+
+    ipcMain.once(IpcChannels.SESSION_CONTEXT, handler);
+    sendToRenderer(IpcChannels.SESSION_CONTEXT);
+  });
+}
+
+async function startSession(): Promise<void> {
   if (status !== 'idle') return;
   info('Session starting');
 
@@ -70,8 +90,19 @@ function startSession(): void {
   sendStatus(status);
 
   const settings = getSettings();
+
+  let contextText: string | undefined;
+  if (settings.onShow === 'append') {
+    contextText = await getEditorContextText() || undefined;
+    // Check if session was cancelled during the await (e.g., quick dismiss)
+    if (status !== 'connecting') return;
+    if (contextText) {
+      info('Context: %d chars of preceding text', contextText.length);
+    }
+  }
+
   sendToRenderer(IpcChannels.SESSION_START, settings.onShow);
-  connectSoniox(createLifecycleCallbacks());
+  connectSoniox(createLifecycleCallbacks(), contextText);
 }
 
 async function pauseSession(): Promise<void> {

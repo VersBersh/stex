@@ -619,4 +619,55 @@ describe('SonioxClient', () => {
       expect(events.onError.mock.calls[0][0].message).toContain('Failed to parse Soniox response');
     });
   });
+
+  describe('context support', () => {
+    it('includes context in config when contextText is provided', async () => {
+      client.connect(makeSettings(), 'some preceding text');
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+      const configMsg = JSON.parse(socket.send.mock.calls[0][0] as string);
+      expect(configMsg.context).toEqual({ text: 'some preceding text' });
+    });
+
+    it('does not include context when contextText is undefined', async () => {
+      client.connect(makeSettings());
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+      const configMsg = JSON.parse(socket.send.mock.calls[0][0] as string);
+      expect(configMsg).not.toHaveProperty('context');
+    });
+
+    it('does not include context when contextText is empty string', async () => {
+      client.connect(makeSettings(), '');
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+      const configMsg = JSON.parse(socket.send.mock.calls[0][0] as string);
+      expect(configMsg).not.toHaveProperty('context');
+    });
+
+    it('truncates context to 9000 chars from the end', async () => {
+      const longText = 'A'.repeat(5000) + 'B'.repeat(10000);
+      client.connect(makeSettings(), longText);
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+      const configMsg = JSON.parse(socket.send.mock.calls[0][0] as string);
+      expect(configMsg.context.text.length).toBe(9000);
+      // Should keep the tail (all B's plus some A's)
+      expect(configMsg.context.text).toBe(longText.slice(-9000));
+    });
+
+    it('does not truncate context under 9000 chars', async () => {
+      const text = 'X'.repeat(8999);
+      client.connect(makeSettings(), text);
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+      const configMsg = JSON.parse(socket.send.mock.calls[0][0] as string);
+      expect(configMsg.context.text).toBe(text);
+    });
+  });
 });
