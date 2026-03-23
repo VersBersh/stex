@@ -412,6 +412,94 @@ describe('SonioxClient', () => {
     });
   });
 
+  describe('endpoint marker filtering', () => {
+    it('filters <end> token from final tokens', async () => {
+      client.connect(makeSettings());
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+      socket.emit(
+        'message',
+        makeResponse(
+          [
+            { text: 'Hello ', start_ms: 0, end_ms: 300, confidence: 0.95, is_final: true },
+            { text: '<end>', start_ms: 300, end_ms: 300, confidence: 1.0, is_final: true },
+          ],
+          300,
+          300,
+        ),
+      );
+
+      expect(events.onFinalTokens).toHaveBeenCalledTimes(1);
+      expect(events.onFinalTokens.mock.calls[0][0]).toEqual([
+        { text: 'Hello ', start_ms: 0, end_ms: 300, confidence: 0.95, is_final: true },
+      ]);
+    });
+
+    it('filters <end> token from non-final tokens', async () => {
+      client.connect(makeSettings());
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+      socket.emit(
+        'message',
+        makeResponse(
+          [
+            { text: 'world', start_ms: 0, end_ms: 200, confidence: 0.7, is_final: false },
+            { text: '<end>', start_ms: 200, end_ms: 200, confidence: 1.0, is_final: false },
+          ],
+          0,
+          200,
+        ),
+      );
+
+      expect(events.onNonFinalTokens).toHaveBeenCalledTimes(1);
+      expect(events.onNonFinalTokens.mock.calls[0][0]).toEqual([
+        { text: 'world', start_ms: 0, end_ms: 200, confidence: 0.7, is_final: false },
+      ]);
+    });
+
+    it('does not filter tokens with similar but different text', async () => {
+      client.connect(makeSettings());
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+      socket.emit(
+        'message',
+        makeResponse(
+          [
+            { text: '<br>', start_ms: 0, end_ms: 100, confidence: 0.9, is_final: true },
+            { text: 'end', start_ms: 100, end_ms: 200, confidence: 0.9, is_final: true },
+            { text: '<END>', start_ms: 200, end_ms: 300, confidence: 0.9, is_final: true },
+          ],
+          300,
+          300,
+        ),
+      );
+
+      expect(events.onFinalTokens).toHaveBeenCalledTimes(1);
+      expect(events.onFinalTokens.mock.calls[0][0]).toHaveLength(3);
+    });
+
+    it('emits empty non-final tokens when response contains only <end> token', async () => {
+      client.connect(makeSettings());
+      await vi.waitFor(() => expect(events.onConnected).toHaveBeenCalled());
+
+      const socket = lastCreatedSocket()!;
+      socket.emit(
+        'message',
+        makeResponse(
+          [{ text: '<end>', start_ms: 0, end_ms: 0, confidence: 1.0, is_final: true }],
+          0,
+          0,
+        ),
+      );
+
+      expect(events.onFinalTokens).not.toHaveBeenCalled();
+      expect(events.onNonFinalTokens).toHaveBeenCalledWith([]);
+    });
+  });
+
   describe('message data handling', () => {
     it('handles Buffer message data', async () => {
       client.connect(makeSettings());

@@ -92,9 +92,10 @@ Response 5:  [("How are ", final), ("you doing", final)]
 
 ```
 1. Parse response
-2. Separate final tokens (new ones only, based on audio_final_proc_ms advancing)
-3. Commit new final tokens to the Lexical editor as EditorBlocks
-4. Replace ghost text with current non-final tokens
+2. Filter out protocol markers (e.g. `<end>` endpoint detection tokens)
+3. Separate final tokens (new ones only, based on audio_final_proc_ms advancing)
+4. Commit new final tokens to the Lexical editor as EditorBlocks
+5. Replace ghost text with current non-final tokens
 ```
 
 ### Tracking finalization progress:
@@ -103,10 +104,12 @@ Response 5:  [("How are ", final), ("you doing", final)]
 let lastFinalProcMs = 0;
 
 function onMessage(response: SonioxResponse) {
-  const newFinalTokens = response.tokens.filter(
+  // Filter protocol markers (e.g. <end> from endpoint detection)
+  const contentTokens = response.tokens.filter(t => t.text !== '<end>');
+  const newFinalTokens = contentTokens.filter(
     t => t.is_final && t.start_ms >= lastFinalProcMs
   );
-  const nonFinalTokens = response.tokens.filter(t => !t.is_final);
+  const nonFinalTokens = contentTokens.filter(t => !t.is_final);
 
   if (newFinalTokens.length > 0) {
     commitToEditor(newFinalTokens);
