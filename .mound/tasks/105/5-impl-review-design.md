@@ -1,0 +1,6 @@
+**Verdict** — `Approved with Notes`
+
+**Issues**
+1. Minor - Embedded Design Principle / Accuracy: The new re-evaluation entry in [spec/decisions.md](/C:/code/draftable/stex/.mound/worktrees/worker-2-2103c5cf/spec/decisions.md#L85) says “none of the three revisit triggers are met,” but the evidence recorded in that same sentence only substantiates trigger 1 (SDK age/version) and trigger 3 (close-code coupling). The repo does support those two claims via [error-classification.ts](/C:/code/draftable/stex/.mound/worktrees/worker-2-2103c5cf/src/main/error-classification.ts#L48) and [soniox.ts](/C:/code/draftable/stex/.mound/worktrees/worker-2-2103c5cf/src/main/soniox.ts#L133), but trigger 2 (“Soniox changes their WebSocket protocol in a breaking way”) is external and is not evidenced by the changed text. That makes the ADR slightly over-assertive. Suggested fix: narrow the sentence to the triggers actually checked, or explicitly say no protocol change was identified in the review scope.
+
+Other than that, the change is small, focused, and consistent with the surrounding architecture record. The added note keeps the decision history understandable, and the two implementation-dependent claims it makes are accurately reflected in the current code.

@@ -80,3 +80,6 @@ However, migration is not recommended at this time for the following reasons:
 - The SDK reaches v2.x or has 6+ months of production usage
 - Soniox changes their WebSocket protocol in a breaking way
 - Error classification is refactored to not depend on raw close codes
+
+**Re-evaluation log**:
+- **2026-03-23** — Re-evaluated (task 105). Checked npm registry: SDK still at v1.1.2 (4 releases between Feb 9–24, 2026; no releases since). No v2.x. Only ~1.5 months since initial publish, well short of the 6-month production usage threshold. Checked codebase: `classifyDisconnect()` in `error-classification.ts` still switches on raw WebSocket close codes (1000, 1001, 1006, 1008, 1011); `lastFinalProcMs` watermark in `soniox.ts` still depends on raw `final_audio_proc_ms` field; implementation remains ~156 lines with 21 passing tests (low benefit-to-risk unchanged). No WebSocket protocol breaking change observed (existing endpoint `wss://stt-rt.soniox.com/transcribe-websocket` still in use). All four original concerns remain valid; none of the three revisit triggers are met. **Decision: Defer. Next re-evaluation ~Sep 2026.**
