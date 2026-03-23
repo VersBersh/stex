@@ -130,6 +130,7 @@ Session Manager (Main Process)
 | Renderer → Main | `window:escape-hide` | — | Quick dismiss — stops session without finalization or clipboard, hides immediately (Escape key) |
 | Renderer → Main | `settings:get` | — | Request current settings |
 | Renderer → Main | `settings:set` | `key: string, value: unknown` | Update a single setting |
+| Renderer → Main | `audio:get-devices` | — | Request list of available audio input device names |
 | Main → Renderer | `settings:updated` | `AppSettings` | Push settings changes |
 | Main → Renderer | `session:error` | `ErrorInfo \| null` | Push error details for error banner display; `null` clears the current error (recovery) |
 | Renderer → Main | `session:open-settings` | — | User clicked "Open Settings" action on error banner |

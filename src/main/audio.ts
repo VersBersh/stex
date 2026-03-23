@@ -85,6 +85,6 @@ export function stopCapture(): void {
 
 export function registerAudioIpc(): void {
   ipcMain.handle(IpcChannels.AUDIO_GET_DEVICES, () => {
-    return [];
+    return listDevices().map(d => d.name);
   });
 }

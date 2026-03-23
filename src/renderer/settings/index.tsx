@@ -38,7 +38,15 @@ function App() {
       setSettings(updated);
     });
 
-    return unsubscribe;
+    const handleFocus = () => {
+      window.settingsApi.getAudioDevices().then(setAudioDevices);
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const handleSettingChange = useCallback(

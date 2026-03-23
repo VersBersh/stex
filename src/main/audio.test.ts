@@ -234,11 +234,11 @@ describe('registerAudioIpc', () => {
     expect(mockHandlers.has(IpcChannels.AUDIO_GET_DEVICES)).toBe(true);
   });
 
-  it('AUDIO_GET_DEVICES handler returns an empty array', async () => {
+  it('AUDIO_GET_DEVICES handler returns input device names', async () => {
+    mockGetDevices.mockReturnValue([...mockDevices]);
     registerAudioIpc();
     const handler = mockHandlers.get(IpcChannels.AUDIO_GET_DEVICES)!;
     const result = await handler({});
-    expect(result).toEqual([]);
-    expect(Array.isArray(result)).toBe(true);
+    expect(result).toEqual(['Built-in Microphone', 'USB Headset', 'Virtual Cable']);
   });
 });
