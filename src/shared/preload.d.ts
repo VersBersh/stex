@@ -7,6 +7,7 @@ export interface ElectronAPI {
   getResolvedTheme(): Promise<'light' | 'dark'>;
 
   // Send (Renderer → Main, fire-and-forget)
+  log(level: 'debug' | 'info' | 'warn' | 'error', message: string): void;
   sessionRequestPause(): void;
   sessionRequestResume(): void;
   sendSessionText(text: string): void;
@@ -31,6 +32,7 @@ export interface ElectronAPI {
 }
 
 export interface SettingsAPI {
+  log(level: 'debug' | 'info' | 'warn' | 'error', message: string): void;
   getSettings(): Promise<AppSettings>;
   setSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]): Promise<void>;
   onSettingsUpdated(callback: (settings: AppSettings) => void): () => void;

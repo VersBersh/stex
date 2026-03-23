@@ -4,6 +4,9 @@ import type { ElectronAPI } from '../shared/preload';
 import type { AppSettings, SonioxToken, SessionState, ErrorInfo } from '../shared/types';
 
 const api: ElectronAPI = {
+  // Send (Renderer → Main, fire-and-forget)
+  log: (level: string, message: string) => ipcRenderer.send(IpcChannels.LOG_FROM_RENDERER, level, message),
+
   // Invoke (Renderer → Main, request-response)
   settingsGet: () => ipcRenderer.invoke(IpcChannels.SETTINGS_GET),
   settingsSet: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>

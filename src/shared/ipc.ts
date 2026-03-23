@@ -23,4 +23,5 @@ export const IpcChannels = {
   SESSION_DISMISS_ERROR: 'session:dismiss-error',
   LOG_PATH_GET: 'log:get-path',
   LOG_REVEAL: 'log:reveal',
+  LOG_FROM_RENDERER: 'log:from-renderer',
 } as const;

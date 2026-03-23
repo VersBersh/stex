@@ -2,7 +2,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { format } from 'util';
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+export const LOG_LEVELS: ReadonlySet<string> = new Set<LogLevel>(['debug', 'info', 'warn', 'error']);
+
+export function isLogLevel(value: unknown): value is LogLevel {
+  return typeof value === 'string' && LOG_LEVELS.has(value);
+}
 
 const LEVEL_PRIORITY: Record<LogLevel, number> = {
   debug: 0,
@@ -48,11 +54,10 @@ export function initLogger(opts: { logDir: string; level?: LogLevel }): void {
   }
 }
 
-function log(level: LogLevel, message: string, ...args: unknown[]): void {
+function writeLog(level: LogLevel, source: string, formatted: string): void {
   if (LEVEL_PRIORITY[level] < LEVEL_PRIORITY[currentLevel]) return;
 
-  const formatted = format(message, ...args);
-  const line = `[${new Date().toISOString()}] [${level.toUpperCase()}] ${formatted}\n`;
+  const line = `[${new Date().toISOString()}] [${level.toUpperCase()}] [${source}] ${formatted}\n`;
 
   if (logFile) {
     try {
@@ -74,17 +79,22 @@ export function getLogFilePath(): string | null {
 }
 
 export function debug(message: string, ...args: unknown[]): void {
-  log('debug', message, ...args);
+  writeLog('debug', 'main', format(message, ...args));
 }
 
 export function info(message: string, ...args: unknown[]): void {
-  log('info', message, ...args);
+  writeLog('info', 'main', format(message, ...args));
 }
 
 export function warn(message: string, ...args: unknown[]): void {
-  log('warn', message, ...args);
+  writeLog('warn', 'main', format(message, ...args));
 }
 
 export function error(message: string, ...args: unknown[]): void {
-  log('error', message, ...args);
+  writeLog('error', 'main', format(message, ...args));
+}
+
+export function logFromRenderer(level: LogLevel, message: string): void {
+  const sanitized = message.replace(/[\r\n]+/g, ' ');
+  writeLog(level, 'renderer', sanitized);
 }

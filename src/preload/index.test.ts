@@ -252,6 +252,19 @@ describe('Preload bridge', () => {
     });
   });
 
+  describe('log method', () => {
+    it('exposes log', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      expect(typeof api.log).toBe('function');
+    });
+
+    it('log calls ipcRenderer.send with log:from-renderer channel', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      api.log('error', 'something broke');
+      expect(mockSend).toHaveBeenCalledWith('log:from-renderer', 'error', 'something broke');
+    });
+  });
+
   describe('onRequestSessionText', () => {
     it('exposes onRequestSessionText', () => {
       const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;

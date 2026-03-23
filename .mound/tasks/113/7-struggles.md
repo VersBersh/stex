@@ -1,0 +1,1 @@
+No struggles. Both conflicts were simple additive merges — the HEAD side added `LOG_PATH_GET`/`LOG_REVEAL` channels and `getLogFilePath` export, while the cherry-picked commit added `LOG_FROM_RENDERER` and `logFromRenderer`/`isLogLevel`. Resolution was to keep all additions from both sides.

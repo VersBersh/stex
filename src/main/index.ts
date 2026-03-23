@@ -8,10 +8,12 @@ import { registerAudioIpc } from './audio';
 import { initThemeManager } from './theme';
 import { initSessionManager } from './session';
 import { initLogger } from './logger';
+import { registerLogIpc } from './log-ipc';
 
 export function initApp(): void {
   const logDir = path.join(app.getPath('userData'), 'logs');
   initLogger({ logDir, level: app.isPackaged ? 'info' : 'debug' });
+  registerLogIpc();
 
   registerSettingsIpc();
   registerAudioIpc();

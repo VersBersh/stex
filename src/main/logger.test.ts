@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { initLogger, debug, info, warn, error, getLogFilePath } from './logger';
+import { initLogger, debug, info, warn, error, getLogFilePath, logFromRenderer, isLogLevel } from './logger';
 
 function createTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'stex-logger-test-'));
@@ -97,12 +97,12 @@ describe('logger', () => {
   });
 
   describe('format', () => {
-    it('includes timestamp, level, and message', () => {
+    it('includes timestamp, level, source, and message', () => {
       initLogger({ logDir, level: 'debug' });
       info('hello world');
 
       const content = readLog(logDir);
-      expect(content).toMatch(/\[\d{4}-\d{2}-\d{2}T[\d:.]+Z\] \[INFO\] hello world/);
+      expect(content).toMatch(/\[\d{4}-\d{2}-\d{2}T[\d:.]+Z\] \[INFO\] \[main\] hello world/);
     });
 
     it('supports format string interpolation (%s, %d)', () => {
@@ -119,6 +119,14 @@ describe('logger', () => {
 
       const content = readLog(logDir);
       expect(content).toContain('event extra1 42');
+    });
+
+    it('includes [main] source tag for main-process log calls', () => {
+      initLogger({ logDir });
+      warn('test warning');
+
+      const content = readLog(logDir);
+      expect(content).toContain('[WARN] [main] test warning');
     });
   });
 
@@ -189,6 +197,65 @@ describe('logger', () => {
       const content = readLog(logDir);
       expect(content).toContain('small log');
       expect(content).toContain('appended');
+    });
+  });
+
+  describe('isLogLevel', () => {
+    it('returns true for valid log levels', () => {
+      expect(isLogLevel('debug')).toBe(true);
+      expect(isLogLevel('info')).toBe(true);
+      expect(isLogLevel('warn')).toBe(true);
+      expect(isLogLevel('error')).toBe(true);
+    });
+
+    it('returns false for invalid strings', () => {
+      expect(isLogLevel('critical')).toBe(false);
+      expect(isLogLevel('WARN')).toBe(false);
+      expect(isLogLevel('')).toBe(false);
+    });
+
+    it('returns false for non-strings', () => {
+      expect(isLogLevel(42)).toBe(false);
+      expect(isLogLevel(null)).toBe(false);
+      expect(isLogLevel(undefined)).toBe(false);
+    });
+  });
+
+  describe('logFromRenderer', () => {
+    it('writes with [renderer] source tag', () => {
+      initLogger({ logDir });
+      logFromRenderer('error', 'renderer crash');
+
+      const content = readLog(logDir);
+      expect(content).toContain('[ERROR] [renderer] renderer crash');
+    });
+
+    it('writes with the correct level', () => {
+      initLogger({ logDir });
+      logFromRenderer('warn', 'renderer warning');
+
+      const content = readLog(logDir);
+      expect(content).toContain('[WARN] [renderer] renderer warning');
+    });
+
+    it('respects the configured log level', () => {
+      initLogger({ logDir, level: 'warn' });
+      logFromRenderer('info', 'should be filtered');
+      logFromRenderer('warn', 'should appear');
+
+      const content = readLog(logDir);
+      expect(content).not.toContain('should be filtered');
+      expect(content).toContain('should appear');
+    });
+
+    it('sanitizes newlines in renderer messages', () => {
+      initLogger({ logDir });
+      logFromRenderer('error', 'line1\nfake\r\ninjection');
+
+      const content = readLog(logDir);
+      const lines = content.trim().split('\n');
+      expect(lines).toHaveLength(1);
+      expect(content).toContain('[ERROR] [renderer] line1 fake injection');
     });
   });
 });

@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { exposed, mockInvoke, mockOn, mockRemoveListener } = vi.hoisted(() => {
+const { exposed, mockInvoke, mockSend, mockOn, mockRemoveListener } = vi.hoisted(() => {
   const exposed: { settingsApi: Record<string, unknown> | null } = { settingsApi: null };
   const mockInvoke = vi.fn();
+  const mockSend = vi.fn();
   const mockOn = vi.fn();
   const mockRemoveListener = vi.fn();
-  return { exposed, mockInvoke, mockOn, mockRemoveListener };
+  return { exposed, mockInvoke, mockSend, mockOn, mockRemoveListener };
 });
 
 vi.mock('electron', () => ({
@@ -16,6 +17,7 @@ vi.mock('electron', () => ({
   },
   ipcRenderer: {
     invoke: mockInvoke,
+    send: mockSend,
     on: mockOn,
     removeListener: mockRemoveListener,
   },
@@ -25,6 +27,7 @@ describe('Settings preload bridge', () => {
   beforeEach(async () => {
     exposed.settingsApi = null;
     mockInvoke.mockClear();
+    mockSend.mockClear();
     mockOn.mockClear();
     mockRemoveListener.mockClear();
     vi.resetModules();
@@ -104,6 +107,19 @@ describe('Settings preload bridge', () => {
       const api = exposed.settingsApi as Record<string, (...args: unknown[]) => unknown>;
       await api.revealLogFile();
       expect(mockInvoke).toHaveBeenCalledWith('log:reveal');
+    });
+  });
+
+  describe('log method', () => {
+    it('exposes log', () => {
+      const api = exposed.settingsApi as Record<string, (...args: unknown[]) => unknown>;
+      expect(typeof api.log).toBe('function');
+    });
+
+    it('log calls ipcRenderer.send with log:from-renderer channel', () => {
+      const api = exposed.settingsApi as Record<string, (...args: unknown[]) => unknown>;
+      api.log('warn', 'settings warning');
+      expect(mockSend).toHaveBeenCalledWith('log:from-renderer', 'warn', 'settings warning');
     });
   });
 

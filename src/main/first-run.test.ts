@@ -11,6 +11,7 @@ const {
   mockInitSessionManager,
   mockInitTray,
   mockInitHotkeyManager,
+  mockRegisterLogIpc,
 } = vi.hoisted(() => {
   const mockSettingsData: Record<string, unknown> = { sonioxApiKey: '' };
   const mockShowSettings = vi.fn();
@@ -21,6 +22,7 @@ const {
   const mockInitSessionManager = vi.fn();
   const mockInitTray = vi.fn();
   const mockInitHotkeyManager = vi.fn();
+  const mockRegisterLogIpc = vi.fn();
   return {
     mockSettingsData,
     mockShowSettings,
@@ -31,6 +33,7 @@ const {
     mockInitSessionManager,
     mockInitTray,
     mockInitHotkeyManager,
+    mockRegisterLogIpc,
   };
 });
 
@@ -79,6 +82,10 @@ vi.mock('./hotkey', () => ({
   initHotkeyManager: (...args: unknown[]) => mockInitHotkeyManager(...args),
 }));
 
+vi.mock('./log-ipc', () => ({
+  registerLogIpc: (...args: unknown[]) => mockRegisterLogIpc(...args),
+}));
+
 import { initApp } from './index';
 
 describe('First-run experience', () => {
@@ -119,6 +126,7 @@ describe('First-run experience', () => {
     expect(mockInitSessionManager).toHaveBeenCalledOnce();
     expect(mockInitTray).toHaveBeenCalledOnce();
     expect(mockInitHotkeyManager).toHaveBeenCalledOnce();
+    expect(mockRegisterLogIpc).toHaveBeenCalledOnce();
   });
 
   it('initializes all managers when API key exists', () => {
@@ -132,5 +140,6 @@ describe('First-run experience', () => {
     expect(mockInitSessionManager).toHaveBeenCalledOnce();
     expect(mockInitTray).toHaveBeenCalledOnce();
     expect(mockInitHotkeyManager).toHaveBeenCalledOnce();
+    expect(mockRegisterLogIpc).toHaveBeenCalledOnce();
   });
 });

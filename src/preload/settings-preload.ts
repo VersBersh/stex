@@ -4,6 +4,8 @@ import type { SettingsAPI } from '../shared/preload';
 import type { AppSettings } from '../shared/types';
 
 const settingsApi: SettingsAPI = {
+  log: (level: string, message: string) => ipcRenderer.send(IpcChannels.LOG_FROM_RENDERER, level, message),
+
   getSettings: () => ipcRenderer.invoke(IpcChannels.SETTINGS_GET),
 
   setSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) =>
