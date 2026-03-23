@@ -1,14 +1,21 @@
 import WebSocket from 'ws';
 import { SonioxToken, AppSettings } from '../shared/types';
-import { info, debug } from './logger';
+import { info, debug, error as logError } from './logger';
 
 const SONIOX_ENDPOINT = 'wss://stt-rt.soniox.com/transcribe-websocket';
+
+export interface SonioxErrorResponse {
+  error_code: string;
+  error_message: string;
+}
 
 export interface SonioxResponse {
   tokens: SonioxToken[];
   final_audio_proc_ms: number;
   total_audio_proc_ms: number;
   finished?: boolean;
+  error_code?: string;
+  error_message?: string;
 }
 
 export interface SonioxClientEvents {
@@ -53,6 +60,7 @@ export class SonioxClient {
         sample_rate: 16000,
         num_channels: 1,
         language_hints: [settings.language],
+        enable_endpoint_detection: true,
         max_endpoint_delay_ms: settings.maxEndpointDelayMs,
       };
       debug('Soniox config: model=%s, language=%s, max_endpoint_delay_ms=%d',
@@ -105,6 +113,16 @@ export class SonioxClient {
       response = JSON.parse(text);
     } catch (err) {
       this.events.onError?.(new Error(`Failed to parse Soniox response: ${err}`));
+      return;
+    }
+
+    if (response.error_code) {
+      logError('Soniox server error: %s — %s', response.error_code, response.error_message);
+      this.events.onError?.(new Error(`Soniox: ${response.error_code} — ${response.error_message}`));
+      return;
+    }
+
+    if (!response.tokens) {
       return;
     }
 

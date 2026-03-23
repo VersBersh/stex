@@ -119,6 +119,7 @@ describe('SonioxClient', () => {
         sample_rate: 16000,
         num_channels: 1,
         language_hints: ['en'],
+        enable_endpoint_detection: true,
         max_endpoint_delay_ms: 1500,
       });
     });

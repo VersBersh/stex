@@ -107,7 +107,9 @@ export function resumeCapture(): void {
 export function connectSoniox(callbacks: SonioxLifecycleCallbacks): void {
   activeCallbacks = callbacks;
   const settings = getSettings();
-  info('Connecting to Soniox');
+  const keyLen = settings.sonioxApiKey.length;
+  const keyPreview = keyLen > 4 ? settings.sonioxApiKey.slice(0, 4) + '...' : '(empty)';
+  info('Connecting to Soniox (key=%s, len=%d)', keyPreview, keyLen);
 
   soniox = new SonioxClient({
     onConnected: () => {
