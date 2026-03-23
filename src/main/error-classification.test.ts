@@ -40,12 +40,18 @@ describe('classifyAudioError', () => {
 
 describe('classifyDisconnect', () => {
   describe('standard close codes (code-based classification)', () => {
-    it('returns reconnectable for 1000 (normal closure)', () => {
+    it('returns non-reconnectable for 1000 (normal closure)', () => {
       const result = classifyDisconnect(1000, '');
       expect(result).toEqual({
-        reconnectable: true,
-        error: { type: 'network', message: 'Connection lost' },
+        reconnectable: false,
+        error: { type: 'unknown', message: 'Connection closed by server' },
       });
+    });
+
+    it('classifies 1000 with auth reason as api-key error', () => {
+      const result = classifyDisconnect(1000, 'invalid api key');
+      expect(result.reconnectable).toBe(false);
+      expect(result.error.type).toBe('api-key');
     });
 
     it('returns reconnectable for 1001 (going away)', () => {

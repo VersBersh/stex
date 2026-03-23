@@ -48,7 +48,11 @@ function classifyByReason(
 export function classifyDisconnect(code: number, reason: string): { reconnectable: boolean; error: ErrorInfo } {
   // Tier 1: Standard WebSocket close codes (RFC 6455) with unambiguous semantics
   switch (code) {
-    case 1000: // Normal closure — server-initiated (user-initiated bypasses this path)
+    case 1000: // Normal closure — server deliberately ended the session; do not reconnect
+      return classifyByReason(reason, {
+        reconnectable: false,
+        error: { type: 'unknown', message: reason || 'Connection closed by server' },
+      });
     case 1001: // Going away
     case 1006: // Abnormal closure (network failure)
     case 1011: // Internal server error
