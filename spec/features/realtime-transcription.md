@@ -19,6 +19,7 @@ Stream microphone audio to the Soniox WebSocket API and display transcribed text
 2. Non-final tokens **update in place** as Soniox refines its hypothesis
 3. When Soniox is confident, tokens become **final** — they are committed into the editor as permanent text
 4. The ghost text region always sits after all committed text
+5. While ghost text is updating, the cursor auto-tracks the end of committed text (per-event position check — see inline-editing spec for the cursor-at-end contract)
 
 ### Ending a Session
 

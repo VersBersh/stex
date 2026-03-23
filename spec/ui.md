@@ -67,6 +67,11 @@
 - Mouse drag selection that extends into ghost text: selection stops at end of committed text
 - Backspace at the boundary (cursor at end of committed text): deletes the last committed character (normal behavior)
 
+**Cursor auto-tracking**:
+- While ghost text is updating, the cursor stays at the end of committed text if it was already there — this is a per-event position check, consistent with the final-token cursor tracking in the inline-editing spec
+- If the cursor is not at the document end (e.g., user clicked mid-document to edit), it stays in place — ghost text updates do not move the cursor
+- On each new voice input session, the cursor is moved to the end of committed text, re-enabling auto-tracking
+
 ## Status Bar
 
 - **Left**: Microphone icon + state text ("Recording...", "Paused", "Connecting...")

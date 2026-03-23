@@ -1,0 +1,1 @@
+No struggles. The conflict was a single textual clash in GhostTextPlugin.tsx where main had updated a scroll-follow comment (task 116) while the incoming commit added cursor-tracking code above the same comment. Resolution was straightforward: keep both the new cursor-tracking code and main's improved comment.

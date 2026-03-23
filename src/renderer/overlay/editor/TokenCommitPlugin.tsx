@@ -4,12 +4,12 @@ import {
   $getRoot,
   $getSelection,
   $isRangeSelection,
-  $isTextNode,
   $setSelection,
   $createTextNode,
   $createParagraphNode,
   $isParagraphNode,
 } from 'lexical';
+import { $isCursorAtDocumentEnd } from './cursor-track-utils';
 import type { HistoryState } from '@lexical/history';
 import type { EditorBlockManager, BlockHistory } from './editorBlockManager';
 import type { SonioxToken } from '../../../shared/types';
@@ -79,29 +79,7 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
           // Any non-collapsed selection or mid-document caret must be preserved.
           const prevSelection = $getSelection();
           const isRange = $isRangeSelection(prevSelection);
-          if (isRange) {
-            if (!prevSelection.isCollapsed()) {
-              cursorAtEnd = false;
-            } else {
-              const lastParagraph = root.getLastChild();
-              if ($isParagraphNode(lastParagraph)) {
-                const anchorNode = prevSelection.anchor.getNode();
-                const lastTextNode = lastParagraph.getLastChild();
-                if ($isTextNode(lastTextNode)) {
-                  // Caret on last text node at its end
-                  cursorAtEnd =
-                    anchorNode.getKey() === lastTextNode.getKey() &&
-                    prevSelection.anchor.offset === lastTextNode.getTextContentSize();
-                } else if (anchorNode.getKey() === lastParagraph.getKey()) {
-                  // Caret on the paragraph element itself (at the end when no text nodes exist
-                  // or after the last child)
-                  cursorAtEnd = prevSelection.anchor.offset === lastParagraph.getChildrenSize();
-                } else {
-                  cursorAtEnd = false;
-                }
-              }
-            }
-          }
+          cursorAtEnd = $isCursorAtDocumentEnd();
 
           // 2. Save selection state before mutation
           const savedAnchorKey = isRange ? prevSelection.anchor.key : null;
