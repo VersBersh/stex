@@ -19,7 +19,7 @@ export function $isCursorAtDocumentEnd(): boolean {
 
   const root = $getRoot();
   const lastParagraph = root.getLastChild();
-  if (!$isParagraphNode(lastParagraph)) return false;
+  if (!$isParagraphNode(lastParagraph)) return true; // empty root = cursor trivially at end
 
   const anchorNode = selection.anchor.getNode();
   const lastTextNode = lastParagraph.getLastChild();

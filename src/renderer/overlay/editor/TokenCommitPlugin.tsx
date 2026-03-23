@@ -9,7 +9,7 @@ import {
   $createParagraphNode,
   $isParagraphNode,
 } from 'lexical';
-import { $isCursorAtDocumentEnd } from './cursor-track-utils';
+import { $isCursorAtDocumentEnd, $moveCursorToDocumentEnd } from './cursor-track-utils';
 import type { HistoryState } from '@lexical/history';
 import type { EditorBlockManager, BlockHistory } from './editorBlockManager';
 import type { SonioxToken } from '../../../shared/types';
@@ -79,7 +79,9 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
           // Any non-collapsed selection or mid-document caret must be preserved.
           const prevSelection = $getSelection();
           const isRange = $isRangeSelection(prevSelection);
-          cursorAtEnd = $isCursorAtDocumentEnd();
+          // No range selection (e.g. editor never focused) → default to tracking.
+          // Stale selection after clear → $isCursorAtDocumentEnd handles via empty-root check.
+          cursorAtEnd = !isRange || $isCursorAtDocumentEnd();
 
           // 2. Save selection state before mutation
           const savedAnchorKey = isRange ? prevSelection.anchor.key : null;
@@ -99,8 +101,11 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
             root.append(paragraph);
           }
 
-          // 4. Restore selection if cursor was mid-document
-          if (!cursorAtEnd && isRange && savedAnchorKey && savedFocusKey) {
+          // 4. Update selection: move cursor to new end if it was tracking,
+          // otherwise restore the mid-document position.
+          if (cursorAtEnd) {
+            $moveCursorToDocumentEnd();
+          } else if (isRange && savedAnchorKey && savedFocusKey) {
             const selection = prevSelection.clone();
             selection.anchor.set(savedAnchorKey, savedAnchorOffset, savedAnchorType);
             selection.focus.set(savedFocusKey, savedFocusOffset, savedFocusType);
