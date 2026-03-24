@@ -10,10 +10,9 @@ After a transcription session, the corrected text needs to go somewhere useful �
 
 - When the window is hidden via hotkey, the app enters a brief **finalizing** state:
   1. Mic capture stops
-  2. An empty frame is sent to Soniox to finalize pending tokens
-  3. The app waits for the `finished: true` response, subject to a 5-second timeout (see [api.md — Manual Finalization](../api.md#manual-finalization)). If the timeout expires, the app proceeds anyway.
-  4. The full document text (committed text only) is copied to the system clipboard
-  5. The window hides
+  2. **If** the WebSocket is connected and there are pending non-final tokens, an empty frame is sent to Soniox to finalize pending tokens and the app waits for the `finished: true` response, subject to a 5-second timeout (see [api.md — Manual Finalization](../api.md#manual-finalization)). If the timeout expires, the app proceeds anyway. If these conditions are not met, finalization is skipped.
+  3. The full document text (committed text only) is copied to the system clipboard
+  4. The window hides
 - If the editor is empty, **nothing is copied** to the clipboard (to avoid overwriting the user's existing clipboard contents)
 - User can then paste into any application
 - A brief **tray icon flash** confirms text was copied (an in-window toast would not be visible since the window is hiding)
