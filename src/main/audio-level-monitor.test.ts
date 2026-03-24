@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeDbFromPcm16, createAudioLevelMonitor } from './audio-level-monitor';
+import { computeDbFromPcm16, createAudioLevelMonitor, createSoundEventDetector } from './audio-level-monitor';
 
 describe('computeDbFromPcm16', () => {
   it('returns -60 for a silent buffer (all zeros)', () => {
@@ -104,5 +104,116 @@ describe('createAudioLevelMonitor', () => {
     const avg1 = monitor.push(-10);
     // Window is now [-40,-30,-20,-10,-10], avg = -22
     expect(avg1).toBe(-22);
+  });
+});
+
+describe('createSoundEventDetector', () => {
+  const THRESHOLD = -30;
+  const CHUNK_MS = 10;
+
+  it('returns null when dB stays below threshold', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    expect(detector.push(-40, CHUNK_MS)).toBeNull();
+    expect(detector.push(-50, CHUNK_MS)).toBeNull();
+    expect(detector.push(-60, CHUNK_MS)).toBeNull();
+  });
+
+  it('returns null when dB equals the threshold', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    expect(detector.push(THRESHOLD, CHUNK_MS)).toBeNull();
+  });
+
+  it('returns null while dB is above threshold (event in progress)', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    expect(detector.push(-20, CHUNK_MS)).toBeNull();
+    expect(detector.push(-15, CHUNK_MS)).toBeNull();
+  });
+
+  it('returns a SoundEvent when dB drops below threshold after being above', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    detector.push(-20, CHUNK_MS); // start event
+    const event = detector.push(-40, CHUNK_MS); // end event
+    expect(event).not.toBeNull();
+    expect(event!.peakDb).toBe(-20);
+    expect(event!.durationMs).toBe(CHUNK_MS);
+    expect(event!.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('tracks peak correctly across multiple above-threshold chunks', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    detector.push(-25, CHUNK_MS);
+    detector.push(-10, CHUNK_MS); // peak
+    detector.push(-20, CHUNK_MS);
+    const event = detector.push(-40, CHUNK_MS);
+    expect(event!.peakDb).toBe(-10);
+  });
+
+  it('computes duration by accumulating per-chunk durations', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    detector.push(-20, CHUNK_MS);
+    detector.push(-20, CHUNK_MS);
+    detector.push(-20, CHUNK_MS);
+    const event = detector.push(-40, CHUNK_MS);
+    expect(event!.durationMs).toBe(30); // 3 chunks × 10ms
+  });
+
+  it('handles variable chunk durations', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    detector.push(-20, 10);
+    detector.push(-20, 20);
+    detector.push(-20, 15);
+    const event = detector.push(-40, 10);
+    expect(event!.durationMs).toBe(45); // 10 + 20 + 15
+  });
+
+  it('detects consecutive events independently', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    // First event
+    detector.push(-20, CHUNK_MS);
+    const event1 = detector.push(-40, CHUNK_MS);
+    expect(event1).not.toBeNull();
+    expect(event1!.peakDb).toBe(-20);
+
+    // Second event
+    detector.push(-15, CHUNK_MS);
+    detector.push(-10, CHUNK_MS);
+    const event2 = detector.push(-40, CHUNK_MS);
+    expect(event2).not.toBeNull();
+    expect(event2!.peakDb).toBe(-10);
+    expect(event2!.durationMs).toBe(20);
+  });
+
+  it('handles single-chunk events', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    detector.push(-20, CHUNK_MS);
+    const event = detector.push(-40, CHUNK_MS);
+    expect(event!.durationMs).toBe(CHUNK_MS);
+  });
+
+  it('flush returns in-progress event', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    detector.push(-25, CHUNK_MS);
+    detector.push(-10, CHUNK_MS);
+    const event = detector.flush();
+    expect(event).not.toBeNull();
+    expect(event!.peakDb).toBe(-10);
+    expect(event!.durationMs).toBe(20);
+  });
+
+  it('flush returns null when no event is in progress', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    expect(detector.flush()).toBeNull();
+  });
+
+  it('flush resets state so next push starts fresh', () => {
+    const detector = createSoundEventDetector(THRESHOLD);
+    detector.push(-20, CHUNK_MS);
+    detector.flush();
+    // Should not be in an event anymore
+    expect(detector.flush()).toBeNull();
+    // Starting a new event works
+    detector.push(-15, CHUNK_MS);
+    const event = detector.push(-40, CHUNK_MS);
+    expect(event!.peakDb).toBe(-15);
   });
 });

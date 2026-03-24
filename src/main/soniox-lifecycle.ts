@@ -3,7 +3,7 @@ import { startCapture, stopCapture } from './audio';
 import { getSettings } from './settings';
 import { classifyAudioError, classifyDisconnect } from './error-classification';
 import { getReconnectDelay } from './reconnect-policy';
-import { MIN_DB, computeDbFromPcm16, createAudioLevelMonitor, type AudioLevelMonitor } from './audio-level-monitor';
+import { MIN_DB, computeDbFromPcm16, createAudioLevelMonitor, createSoundEventDetector, type AudioLevelMonitor, type SoundEventDetector } from './audio-level-monitor';
 import type { SonioxToken, ErrorInfo, SessionState } from '../shared/types';
 import { debug, info, warn, error } from './logger';
 
@@ -23,6 +23,7 @@ let activeCallbacks: SonioxLifecycleCallbacks | null = null;
 let storedContextText: string | null = null;
 let levelMonitor: AudioLevelMonitor | null = null;
 let audioChunkCount = 0;
+let soundEventDetector: SoundEventDetector | null = null;
 
 export function isConnected(): boolean {
   return soniox?.connected ?? false;
@@ -49,6 +50,15 @@ export function cancelReconnect(): void {
   reconnectAttempt = 0;
 }
 
+function flushSoundEvent(): void {
+  if (soundEventDetector) {
+    const event = soundEventDetector.flush();
+    if (event) {
+      debug('sound-event: peak_dB=%s duration_ms=%d timestamp=%s', event.peakDb.toFixed(1), event.durationMs, event.timestamp);
+    }
+  }
+}
+
 export function resetLifecycle(): void {
   debug('Lifecycle reset');
   cancelReconnect();
@@ -57,6 +67,8 @@ export function resetLifecycle(): void {
   storedContextText = null;
   levelMonitor = null;
   audioChunkCount = 0;
+  flushSoundEvent();
+  soundEventDetector = null;
 }
 
 function scheduleReconnect(): void {
@@ -78,6 +90,7 @@ function handleDisconnect(code: number, reason: string): void {
   warn('Soniox disconnected (code=%d, reason=%s)', code, reason);
   stopCapture();
   activeCallbacks?.onAudioLevel?.(MIN_DB);
+  flushSoundEvent();
 
   const { reconnectable, error } = classifyDisconnect(code, reason);
 
@@ -95,15 +108,21 @@ function handleDisconnect(code: number, reason: string): void {
 
 function onAudioData(chunk: Buffer): void {
   soniox?.sendAudio(chunk);
+  const dB = computeDbFromPcm16(chunk);
   audioChunkCount++;
   if (audioChunkCount % 100 === 0) {
-    const logDb = computeDbFromPcm16(chunk);
-    debug('Audio flow: chunks=%d size=%d dB=%.1f', audioChunkCount, chunk.length, logDb);
+    debug('Audio flow: chunks=%d size=%d dB=%.1f', audioChunkCount, chunk.length, dB);
   }
   if (levelMonitor && activeCallbacks?.onAudioLevel) {
-    const dB = computeDbFromPcm16(chunk);
     const smoothed = levelMonitor.push(dB);
     activeCallbacks.onAudioLevel(smoothed);
+  }
+  if (soundEventDetector) {
+    const chunkDurationMs = chunk.length / 2 / 16000 * 1000;
+    const event = soundEventDetector.push(dB, chunkDurationMs);
+    if (event) {
+      debug('sound-event: peak_dB=%s duration_ms=%d timestamp=%s', event.peakDb.toFixed(1), event.durationMs, event.timestamp);
+    }
   }
 }
 
@@ -111,6 +130,7 @@ function onAudioError(err: Error): void {
   error('Audio capture error: %s', err.message);
   stopCapture();
   activeCallbacks?.onAudioLevel?.(MIN_DB);
+  flushSoundEvent();
   const errorInfo = classifyAudioError(err);
   activeCallbacks?.onStatusChange('error');
   activeCallbacks?.onError(errorInfo);
@@ -134,6 +154,7 @@ export function connectSoniox(callbacks: SonioxLifecycleCallbacks, contextText?:
   storedContextText = contextText ?? null;
   levelMonitor = createAudioLevelMonitor();
   const settings = getSettings();
+  soundEventDetector = createSoundEventDetector(settings.silenceThresholdDb);
   const keyLen = settings.sonioxApiKey.length;
   const keyPreview = keyLen > 4 ? settings.sonioxApiKey.slice(0, 4) + '...' : '(empty)';
   info('Connecting to Soniox (key=%s, len=%d)', keyPreview, keyLen);
