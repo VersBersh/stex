@@ -107,8 +107,8 @@ describe('First-run experience', () => {
   });
 
   it('does not open settings when API key comes from env var (via getSettings)', () => {
-    // getSettings() is mocked here — actual env-var resolution is tested in
-    // settings.test.ts ("resolves sonioxApiKey via resolveSonioxApiKey with env var fallback").
+    // getSettings() is mocked here — actual env-var resolution is covered in
+    // the settings module tests (resolveSonioxApiKey + getSettings env var fallback).
     // This test documents that initApp() treats env-var-resolved keys as "available".
     mockSettingsData.sonioxApiKey = 'env-resolved-key';
     initApp();
