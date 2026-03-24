@@ -80,6 +80,7 @@ export class SonioxClient {
         num_channels: 1,
         language_hints: [settings.language],
         enable_endpoint_detection: true,
+        finalize_on_end: true,
         max_endpoint_delay_ms: settings.maxEndpointDelayMs,
         ...(trimmedContext ? { context: { text: trimmedContext } } : {}),
       };
