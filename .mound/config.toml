@@ -34,3 +34,10 @@
 
 # How often the reaper scans for dead workers
 # reaper_interval = "15s"
+
+[test_runner]
+run_all = "npx vitest run --reporter=junit --outputFile=test-results.xml"
+run_targeted = "npx vitest run --reporter=junit --outputFile=test-results.xml -t \"{{test_name}}\""
+results_path = "test-results.xml"
+results_format = "junit-xml"
+timeout_seconds = 120
