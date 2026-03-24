@@ -24,6 +24,7 @@ let storedContextText: string | null = null;
 let levelMonitor: AudioLevelMonitor | null = null;
 let audioChunkCount = 0;
 let soundEventDetector: SoundEventDetector | null = null;
+let awaitingFinalization = false;
 
 export function isConnected(): boolean {
   return soniox?.connected ?? false;
@@ -35,6 +36,7 @@ export function hasPendingNonFinalTokens(): boolean {
 
 export function finalizeSoniox(): void {
   debug('Finalization sent');
+  awaitingFinalization = true;
   soniox?.finalize();
 }
 
@@ -62,6 +64,7 @@ function flushSoundEvent(): void {
 export function resetLifecycle(): void {
   debug('Lifecycle reset');
   cancelReconnect();
+  awaitingFinalization = false;
   soniox?.disconnect();
   soniox = null;
   storedContextText = null;
@@ -92,6 +95,15 @@ function handleDisconnect(code: number, reason: string): void {
   activeCallbacks?.onAudioLevel?.(MIN_DB);
   flushSoundEvent();
 
+  // Close code 1000 during finalization is expected — Soniox signals
+  // completion by closing the WebSocket rather than sending finished:true.
+  if (awaitingFinalization && code === 1000) {
+    info('Soniox closed during finalization (expected)');
+    awaitingFinalization = false;
+    activeCallbacks?.onFinalizationComplete();
+    return;
+  }
+
   const { reconnectable, error } = classifyDisconnect(code, reason);
 
   if (reconnectable) {
@@ -110,8 +122,16 @@ function onAudioData(chunk: Buffer): void {
   soniox?.sendAudio(chunk);
   const dB = computeDbFromPcm16(chunk);
   audioChunkCount++;
-  if (audioChunkCount % 100 === 0) {
-    debug('Audio flow: chunks=%d size=%d dB=%.1f', audioChunkCount, chunk.length, dB);
+  if (audioChunkCount === 1) {
+    const sampleCount = Math.floor(chunk.length / 2);
+    const first4 = [];
+    for (let i = 0; i < Math.min(4, sampleCount); i++) {
+      first4.push(chunk.readInt16LE(i * 2));
+    }
+    info('Audio first chunk: size=%d samples=%d dB=%d firstSamples=%j', chunk.length, sampleCount, dB, first4);
+  }
+  if (audioChunkCount <= 10 || audioChunkCount % 25 === 0) {
+    debug('Audio chunk #%d: size=%d dB=%d', audioChunkCount, chunk.length, dB);
   }
   if (levelMonitor && activeCallbacks?.onAudioLevel) {
     const smoothed = levelMonitor.push(dB);

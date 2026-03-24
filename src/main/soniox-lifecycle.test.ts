@@ -257,6 +257,30 @@ describe('soniox-lifecycle', () => {
 
       expect(callbacks.onAudioLevel).toHaveBeenCalledWith(-60);
     });
+
+    it('treats close code 1000 during finalization as successful completion', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+      callbacks.onStatusChange.mockClear();
+
+      finalizeSoniox();
+      triggerOnDisconnected(1000, '');
+
+      expect(callbacks.onFinalizationComplete).toHaveBeenCalled();
+      expect(callbacks.onStatusChange).not.toHaveBeenCalledWith('error');
+    });
+
+    it('does not treat close code 1000 as finalization when not finalizing', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+      callbacks.onStatusChange.mockClear();
+
+      triggerOnDisconnected(1000, '');
+
+      expect(callbacks.onFinalizationComplete).not.toHaveBeenCalled();
+    });
   });
 
   describe('error handling', () => {

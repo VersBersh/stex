@@ -144,35 +144,34 @@ export class SonioxClient {
       return;
     }
 
-    if (!response.tokens) {
-      return;
-    }
+    if (response.tokens) {
+      const contentTokens = response.tokens.filter((t) => !isEndpointMarker(t));
+      const newFinalTokens = contentTokens.filter(
+        (t) => t.is_final && t.start_ms >= this.lastFinalProcMs,
+      );
+      const nonFinalTokens = contentTokens.filter((t) => !t.is_final);
 
-    const contentTokens = response.tokens.filter((t) => !isEndpointMarker(t));
-    const newFinalTokens = contentTokens.filter(
-      (t) => t.is_final && t.start_ms >= this.lastFinalProcMs,
-    );
-    const nonFinalTokens = contentTokens.filter((t) => !t.is_final);
+      this._hasPendingNonFinalTokens = nonFinalTokens.length > 0;
 
-    this._hasPendingNonFinalTokens = nonFinalTokens.length > 0;
+      debug('Soniox msg: tokens=%d final=%d non-final=%d finished=%s',
+        contentTokens.length, newFinalTokens.length, nonFinalTokens.length, !!response.finished);
 
-    debug('Soniox msg: tokens=%d final=%d non-final=%d finished=%s',
-      contentTokens.length, newFinalTokens.length, nonFinalTokens.length, !!response.finished);
+      if (newFinalTokens.length > 0) {
+        this.events.onFinalTokens?.(newFinalTokens);
+        this.lastFinalProcMs = response.final_audio_proc_ms;
+      }
 
-    if (newFinalTokens.length > 0) {
-      this.events.onFinalTokens?.(newFinalTokens);
-      this.lastFinalProcMs = response.final_audio_proc_ms;
-    }
-
-    if (nonFinalTokens.length > 0) {
-      this.events.onNonFinalTokens?.(nonFinalTokens);
-    } else if (newFinalTokens.length === 0 && response.tokens.length > 0) {
-      // All tokens were protocol markers — signal empty non-final state
-      // so downstream consumers (e.g. ghost text) can clear stale content
-      this.events.onNonFinalTokens?.([]);
+      if (nonFinalTokens.length > 0) {
+        this.events.onNonFinalTokens?.(nonFinalTokens);
+      } else if (newFinalTokens.length === 0 && response.tokens.length > 0) {
+        // All tokens were protocol markers — signal empty non-final state
+        // so downstream consumers (e.g. ghost text) can clear stale content
+        this.events.onNonFinalTokens?.([]);
+      }
     }
 
     if (response.finished) {
+      debug('Soniox msg: finished=true');
       this.events.onFinished?.();
     }
   }

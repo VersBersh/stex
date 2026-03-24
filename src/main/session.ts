@@ -10,7 +10,7 @@ import { connectSoniox, finalizeSoniox, isConnected, hasPendingNonFinalTokens, r
 import { MIN_DB } from './audio-level-monitor';
 import { sendToRenderer, sendStatus, sendError, clearError } from './renderer-send';
 import { copyEditorTextToClipboard } from './session-clipboard';
-import { info, warn } from './logger';
+import { info, warn, debug } from './logger';
 
 const FINALIZATION_TIMEOUT_MS = 5000;
 const CONTEXT_FETCH_TIMEOUT_MS = 500;
@@ -64,6 +64,7 @@ function createLifecycleCallbacks() {
     },
     onAudioLevel: (dB: number) => {
       sendToRenderer(IpcChannels.AUDIO_LEVEL, dB);
+      if (Math.random() < 0.2) debug('Audio level → renderer: dB=%d', dB);
     },
   };
 }

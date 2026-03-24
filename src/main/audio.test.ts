@@ -3,10 +3,10 @@ import { EventEmitter } from 'events';
 
 const { mockDevices, mockSettings, lastCreatedStream, mockGetDevices, SampleFormat16Bit, mockHandlers } = vi.hoisted(() => {
   const mockDevices = [
-    { id: 0, name: 'Built-in Microphone', maxInputChannels: 2, maxOutputChannels: 0, defaultSampleRate: 44100 },
-    { id: 1, name: 'USB Headset', maxInputChannels: 1, maxOutputChannels: 2, defaultSampleRate: 48000 },
-    { id: 2, name: 'Speakers', maxInputChannels: 0, maxOutputChannels: 2, defaultSampleRate: 44100 },
-    { id: 3, name: 'Virtual Cable', maxInputChannels: 2, maxOutputChannels: 2, defaultSampleRate: 44100 },
+    { id: 0, name: 'Built-in Microphone', maxInputChannels: 2, maxOutputChannels: 0, defaultSampleRate: 44100, hostAPIName: 'Windows WASAPI' },
+    { id: 1, name: 'USB Headset', maxInputChannels: 1, maxOutputChannels: 2, defaultSampleRate: 48000, hostAPIName: 'Windows WASAPI' },
+    { id: 2, name: 'Speakers', maxInputChannels: 0, maxOutputChannels: 2, defaultSampleRate: 44100, hostAPIName: 'Windows WASAPI' },
+    { id: 3, name: 'Virtual Cable', maxInputChannels: 2, maxOutputChannels: 2, defaultSampleRate: 44100, hostAPIName: 'Windows WASAPI' },
   ];
 
   const mockSettings = {
@@ -97,6 +97,27 @@ describe('listDevices', () => {
       defaultSampleRate: 44100,
     });
   });
+
+  it('filters to WASAPI devices when available', () => {
+    mockGetDevices.mockReturnValue([
+      { id: 0, name: 'Mic', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 44100, hostAPIName: 'MME' },
+      { id: 1, name: 'Mic', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 44100, hostAPIName: 'Windows WASAPI' },
+      { id: 2, name: 'Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'MME' },
+      { id: 3, name: 'Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'Windows WASAPI' },
+    ]);
+    const devices = listDevices();
+    expect(devices).toHaveLength(2);
+    expect(devices.map(d => d.id)).toEqual([1, 3]);
+  });
+
+  it('falls back to all devices when no WASAPI devices exist', () => {
+    mockGetDevices.mockReturnValue([
+      { id: 0, name: 'Mic', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 44100, hostAPIName: 'MME' },
+      { id: 1, name: 'Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'MME' },
+    ]);
+    const devices = listDevices();
+    expect(devices).toHaveLength(2);
+  });
 });
 
 describe('startCapture', () => {
@@ -135,6 +156,33 @@ describe('startCapture', () => {
     const stream = lastCreatedStream.value!;
     const opts = (stream.options as { inOptions: Record<string, unknown> }).inOptions;
     expect(opts.deviceId).toBe(1);
+    stopCapture();
+  });
+
+  it('prefers WASAPI device when multiple host APIs match the same name', () => {
+    mockGetDevices.mockReturnValue([
+      { id: 5, name: 'USB Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'MME' },
+      { id: 6, name: 'USB Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'Windows WASAPI' },
+    ]);
+    mockSettings.audioInputDevice = 'USB Headset';
+    startCapture(vi.fn(), vi.fn());
+
+    const stream = lastCreatedStream.value!;
+    const opts = (stream.options as { inOptions: Record<string, unknown> }).inOptions;
+    expect(opts.deviceId).toBe(6);
+    stopCapture();
+  });
+
+  it('falls back to non-WASAPI device when no WASAPI match exists', () => {
+    mockGetDevices.mockReturnValue([
+      { id: 5, name: 'USB Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'MME' },
+    ]);
+    mockSettings.audioInputDevice = 'USB Headset';
+    startCapture(vi.fn(), vi.fn());
+
+    const stream = lastCreatedStream.value!;
+    const opts = (stream.options as { inOptions: Record<string, unknown> }).inOptions;
+    expect(opts.deviceId).toBe(5);
     stopCapture();
   });
 
