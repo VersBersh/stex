@@ -3,6 +3,7 @@ import { startCapture, stopCapture } from './audio';
 import { getSettings } from './settings';
 import { classifyAudioError, classifyDisconnect } from './error-classification';
 import { getReconnectDelay } from './reconnect-policy';
+import { computeDbFromPcm16, createAudioLevelMonitor, type AudioLevelMonitor } from './audio-level-monitor';
 import type { SonioxToken, ErrorInfo, SessionState } from '../shared/types';
 import { debug, info, warn, error } from './logger';
 
@@ -12,6 +13,7 @@ export interface SonioxLifecycleCallbacks {
   onStatusChange: (status: SessionState['status']) => void;
   onError: (error: ErrorInfo | null) => void;
   onFinalizationComplete: () => void;
+  onAudioLevel?: (dB: number) => void;
 }
 
 let soniox: SonioxClient | null = null;
@@ -19,6 +21,7 @@ let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempt = 0;
 let activeCallbacks: SonioxLifecycleCallbacks | null = null;
 let storedContextText: string | null = null;
+let levelMonitor: AudioLevelMonitor | null = null;
 
 export function isConnected(): boolean {
   return soniox?.connected ?? false;
@@ -51,6 +54,7 @@ export function resetLifecycle(): void {
   soniox?.disconnect();
   soniox = null;
   storedContextText = null;
+  levelMonitor = null;
 }
 
 function scheduleReconnect(): void {
@@ -88,6 +92,11 @@ function handleDisconnect(code: number, reason: string): void {
 
 function onAudioData(chunk: Buffer): void {
   soniox?.sendAudio(chunk);
+  if (levelMonitor && activeCallbacks?.onAudioLevel) {
+    const dB = computeDbFromPcm16(chunk);
+    const smoothed = levelMonitor.push(dB);
+    activeCallbacks.onAudioLevel(smoothed);
+  }
 }
 
 function onAudioError(err: Error): void {
@@ -113,6 +122,7 @@ export function resumeCapture(): void {
 export function connectSoniox(callbacks: SonioxLifecycleCallbacks, contextText?: string): void {
   activeCallbacks = callbacks;
   storedContextText = contextText ?? null;
+  levelMonitor = createAudioLevelMonitor();
   const settings = getSettings();
   const keyLen = settings.sonioxApiKey.length;
   const keyPreview = keyLen > 4 ? settings.sonioxApiKey.slice(0, 4) + '...' : '(empty)';

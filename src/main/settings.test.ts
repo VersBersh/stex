@@ -136,6 +136,7 @@ describe('APP_SETTINGS_DEFAULTS', () => {
       language: 'en',
       maxEndpointDelayMs: 1000,
       theme: 'system',
+      silenceThresholdDb: -30,
       windowPosition: null,
       windowSize: { width: 600, height: 300 },
     });

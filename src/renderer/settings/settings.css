@@ -259,6 +259,34 @@ body {
   word-break: break-all;
 }
 
+.threshold-scale {
+  position: relative;
+  height: 12px;
+  max-width: 300px;
+  border-radius: 6px;
+  background: linear-gradient(to right, var(--text-muted), #f0ad4e, #4caf50);
+  margin-top: 6px;
+}
+
+.threshold-marker {
+  position: absolute;
+  top: -2px;
+  width: 3px;
+  height: 16px;
+  background: var(--text-primary);
+  border-radius: 1px;
+  transform: translateX(-50%);
+}
+
+.threshold-labels {
+  display: flex;
+  justify-content: space-between;
+  max-width: 300px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 .loading {
   display: flex;
   align-items: center;

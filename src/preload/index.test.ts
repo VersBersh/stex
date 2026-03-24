@@ -142,6 +142,7 @@ describe('Preload bridge', () => {
       'onSettingsUpdated',
       'onThemeChanged',
       'onSessionError',
+      'onAudioLevel',
     ];
 
     for (const method of listenerMethods) {

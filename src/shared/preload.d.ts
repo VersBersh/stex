@@ -31,6 +31,7 @@ export interface ElectronAPI {
   onRequestContextText(callback: () => void): () => void;
   onThemeChanged(callback: (theme: 'light' | 'dark') => void): () => void;
   onSessionError(callback: (error: ErrorInfo | null) => void): () => void;
+  onAudioLevel(callback: (dB: number) => void): () => void;
 }
 
 export interface SettingsAPI {

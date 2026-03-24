@@ -16,6 +16,7 @@ export const IpcChannels = {
   WINDOW_HIDE: 'window:hide',
   WINDOW_ESCAPE_HIDE: 'window:escape-hide',
   AUDIO_GET_DEVICES: 'audio:get-devices',
+  AUDIO_LEVEL: 'audio:level',
   THEME_GET: 'theme:get',
   THEME_RESOLVED: 'theme:resolved',
   SESSION_ERROR: 'session:error',

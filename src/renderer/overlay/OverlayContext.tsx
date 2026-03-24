@@ -11,6 +11,7 @@ interface OverlayContextValue {
   paused: boolean;
   sessionStatus: SessionState['status'];
   error: ErrorInfo | null;
+  audioLevelDb: number;
   requestClear: () => void;
   togglePauseResume: () => void;
   copyText: () => void;
@@ -33,6 +34,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
   const [paused, setPaused] = useState(false);
   const [sessionStatus, setSessionStatus] = useState<SessionState['status']>('idle');
   const [error, setError] = useState<ErrorInfo | null>(null);
+  const [audioLevelDb, setAudioLevelDb] = useState(-60);
   const editorRef = useRef<LexicalEditor | null>(null);
   const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearHooksRef = useRef<Set<() => void>>(new Set());
@@ -124,6 +126,9 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return window.api.onSessionStatus((newStatus) => {
       setSessionStatus(newStatus as SessionState['status']);
+      if (newStatus !== 'recording') {
+        setAudioLevelDb(-60);
+      }
     });
   }, []);
 
@@ -133,6 +138,11 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     return window.api.onSessionError((errorInfo) => {
       setError(errorInfo ?? null);
     });
+  }, []);
+
+  // Subscribe to audio level updates from main process
+  useEffect(() => {
+    return window.api.onAudioLevel(setAudioLevelDb);
   }, []);
 
   useEffect(() => {
@@ -233,6 +243,7 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
         paused,
         sessionStatus,
         error,
+        audioLevelDb,
         requestClear,
         togglePauseResume,
         copyText,

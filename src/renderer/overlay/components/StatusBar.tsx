@@ -1,4 +1,5 @@
 import { useOverlay } from '../OverlayContext';
+import { VolumeMeter } from './VolumeMeter';
 
 const STATUS_TEXT: Record<string, string> = {
   idle: 'Idle',
@@ -11,7 +12,7 @@ const STATUS_TEXT: Record<string, string> = {
 };
 
 export function StatusBar() {
-  const { confirmingClear, paused, sessionStatus, error, requestClear, togglePauseResume, copyText } =
+  const { confirmingClear, paused, sessionStatus, error, audioLevelDb, requestClear, togglePauseResume, copyText } =
     useOverlay();
 
   const canTogglePause = sessionStatus === 'recording' || sessionStatus === 'paused';
@@ -26,6 +27,7 @@ export function StatusBar() {
     <div className="status-bar">
       <div className="status-bar-left">
         <span className="mic-icon">&#x1F3A4;</span>
+        {sessionStatus === 'recording' && <VolumeMeter dB={audioLevelDb} />}
         <span className="status-text">{statusText}</span>
       </div>
       <div className="status-bar-right">

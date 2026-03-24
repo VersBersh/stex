@@ -61,6 +61,9 @@ function createLifecycleCallbacks() {
     onFinalizationComplete: () => {
       currentFinalizationResolver?.();
     },
+    onAudioLevel: (dB: number) => {
+      sendToRenderer(IpcChannels.AUDIO_LEVEL, dB);
+    },
   };
 }
 

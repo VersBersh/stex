@@ -80,6 +80,25 @@
   - **Clear** — clears the editor. If text is present, the button changes to "Confirm?" for 3 seconds (inline confirmation). Clicking again within 3 seconds clears; otherwise reverts to "Clear". No modal dialog.
   - **Copy** — copies all text to clipboard
 
+## Volume Meter
+
+A small horizontal bar in the status bar, between the mic icon and the status text. Visible only during `recording` state.
+
+- **Width**: Proportional to audio level, mapping dB range [-60, 0] to [0%, 100%]
+- **Color**: Dim (muted) below -40dB, amber between -40dB and -20dB, green above -20dB
+- **Update**: Smoothed via rolling average (no flicker), animated with CSS transition
+- **Size**: ~60px wide, 8px tall, rounded corners
+
+### Silence Threshold (Settings)
+
+The General settings page includes a "Silence Threshold" control:
+
+- **Range slider**: -60dB to -10dB, step 1dB
+- **Visual scale**: A horizontal gradient bar (dim to green) below the slider with a marker line at the threshold position
+- **Labels**: -60dB and -10dB at the ends of the scale
+- **Persistence**: Saved as `silenceThresholdDb` in user preferences
+- **Purpose**: Defines the boundary between silence and speech for future voice activity detection (VAD)
+
 ## Error States
 
 When an error occurs (invalid API key, network failure, quota exceeded):

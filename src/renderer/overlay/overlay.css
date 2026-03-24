@@ -154,6 +154,22 @@ html, body, #root {
   border-color: var(--btn-hover-border);
 }
 
+/* Volume Meter */
+.volume-meter {
+  width: 60px;
+  height: 8px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.volume-meter-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 100ms ease-out;
+}
+
 /* Ghost Text */
 .ghost-text {
   color: var(--ghost-text-color);

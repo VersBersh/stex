@@ -117,6 +117,7 @@ interface AppSettings {
   language: string;                // language hint for Soniox
   maxEndpointDelayMs: number;      // 500–3000, controls finalization speed
   theme: "system" | "light" | "dark";
+  silenceThresholdDb: number;      // -60 to -10, silence/speech boundary for VAD
   windowPosition: { x: number; y: number } | null;
   windowSize: { width: number; height: number };
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { AppSettings } from '../../../shared/types';
+import { SILENCE_THRESHOLD_MIN, SILENCE_THRESHOLD_MAX, type AppSettings } from '../../../shared/types';
 
 interface Props {
   settings: AppSettings;
@@ -132,6 +132,37 @@ export function General({ settings, onSettingChange, audioDevices }: Props) {
           Controls how quickly speech is finalized. Lower values finalize faster but may split words.
         </p>
       </div>
+      <div className="setting-group">
+        <label htmlFor="silence-threshold">
+          Silence Threshold
+          <span className="range-value">{settings.silenceThresholdDb}dB</span>
+        </label>
+        <input
+          id="silence-threshold"
+          type="range"
+          min={SILENCE_THRESHOLD_MIN}
+          max={SILENCE_THRESHOLD_MAX}
+          step={1}
+          value={settings.silenceThresholdDb}
+          onChange={(e) =>
+            onSettingChange('silenceThresholdDb', Number(e.target.value))
+          }
+        />
+        <div className="threshold-scale">
+          <div
+            className="threshold-marker"
+            style={{ left: `${((settings.silenceThresholdDb - SILENCE_THRESHOLD_MIN) / (SILENCE_THRESHOLD_MAX - SILENCE_THRESHOLD_MIN)) * 100}%` }}
+          />
+        </div>
+        <div className="threshold-labels">
+          <span>{SILENCE_THRESHOLD_MIN}dB</span>
+          <span>{SILENCE_THRESHOLD_MAX}dB</span>
+        </div>
+        <p className="hint">
+          Audio below this level is treated as silence. Used for voice activity detection.
+        </p>
+      </div>
+
       <div className="setting-group">
         <label>Log File</label>
         <div className="log-path-row">

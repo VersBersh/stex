@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import Store from 'electron-store';
 import { ipcMain, BrowserWindow, safeStorage, shell } from 'electron';
-import { AppSettings } from '../shared/types';
+import { AppSettings, SILENCE_THRESHOLD_MIN, SILENCE_THRESHOLD_MAX } from '../shared/types';
 import { IpcChannels } from '../shared/ipc';
 import { getLogFilePath } from './logger';
 
@@ -51,6 +51,7 @@ export const APP_SETTINGS_DEFAULTS: AppSettings = {
   language: 'en',
   maxEndpointDelayMs: 1000,
   theme: 'system',
+  silenceThresholdDb: -30,
   windowPosition: null,
   windowSize: { width: 600, height: 300 },
 };
@@ -88,6 +89,9 @@ export function onSettingsChanged(listener: (settings: AppSettings) => void): ()
 export function setSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]): void {
   if (key === 'sonioxApiKey') {
     store.set(key, encryptApiKey(value as string) as AppSettings[K]);
+  } else if (key === 'silenceThresholdDb') {
+    const clamped = Math.max(SILENCE_THRESHOLD_MIN, Math.min(SILENCE_THRESHOLD_MAX, value as number));
+    store.set(key, clamped as AppSettings[K]);
   } else {
     store.set(key, value);
   }

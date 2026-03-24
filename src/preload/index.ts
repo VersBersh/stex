@@ -87,6 +87,11 @@ const api: ElectronAPI = {
     ipcRenderer.on(IpcChannels.SESSION_ERROR, handler);
     return () => { ipcRenderer.removeListener(IpcChannels.SESSION_ERROR, handler); };
   },
+  onAudioLevel: (callback: (dB: number) => void) => {
+    const handler = (_event: unknown, dB: number) => callback(dB);
+    ipcRenderer.on(IpcChannels.AUDIO_LEVEL, handler);
+    return () => { ipcRenderer.removeListener(IpcChannels.AUDIO_LEVEL, handler); };
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);

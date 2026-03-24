@@ -54,6 +54,7 @@ export interface AppSettings {
   language: string;
   maxEndpointDelayMs: number;
   theme: "system" | "light" | "dark";
+  silenceThresholdDb: number;
   windowPosition: { x: number; y: number } | null;
   windowSize: { width: number; height: number };
 }
@@ -64,6 +65,9 @@ export interface AudioDevice {
   maxInputChannels: number;
   defaultSampleRate: number;
 }
+
+export const SILENCE_THRESHOLD_MIN = -60;
+export const SILENCE_THRESHOLD_MAX = -10;
 
 export type ResolvedTheme = "light" | "dark";
 
