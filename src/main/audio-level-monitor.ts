@@ -1,4 +1,4 @@
-const MIN_DB = -60;
+export const MIN_DB = -60;
 
 export function computeDbFromPcm16(chunk: Buffer): number {
   const sampleCount = Math.floor(chunk.length / 2);

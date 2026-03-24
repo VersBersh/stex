@@ -3,7 +3,7 @@ import { startCapture, stopCapture } from './audio';
 import { getSettings } from './settings';
 import { classifyAudioError, classifyDisconnect } from './error-classification';
 import { getReconnectDelay } from './reconnect-policy';
-import { computeDbFromPcm16, createAudioLevelMonitor, type AudioLevelMonitor } from './audio-level-monitor';
+import { MIN_DB, computeDbFromPcm16, createAudioLevelMonitor, type AudioLevelMonitor } from './audio-level-monitor';
 import type { SonioxToken, ErrorInfo, SessionState } from '../shared/types';
 import { debug, info, warn, error } from './logger';
 
@@ -77,6 +77,7 @@ function scheduleReconnect(): void {
 function handleDisconnect(code: number, reason: string): void {
   warn('Soniox disconnected (code=%d, reason=%s)', code, reason);
   stopCapture();
+  activeCallbacks?.onAudioLevel?.(MIN_DB);
 
   const { reconnectable, error } = classifyDisconnect(code, reason);
 
@@ -109,6 +110,7 @@ function onAudioData(chunk: Buffer): void {
 function onAudioError(err: Error): void {
   error('Audio capture error: %s', err.message);
   stopCapture();
+  activeCallbacks?.onAudioLevel?.(MIN_DB);
   const errorInfo = classifyAudioError(err);
   activeCallbacks?.onStatusChange('error');
   activeCallbacks?.onError(errorInfo);
@@ -167,6 +169,7 @@ export function connectSoniox(callbacks: SonioxLifecycleCallbacks, contextText?:
     onError: (err: Error) => {
       error('Soniox error: %s', err.message);
       stopCapture();
+      callbacks.onAudioLevel?.(MIN_DB);
       callbacks.onStatusChange('error');
       callbacks.onError({ type: 'unknown', message: err.message });
     },

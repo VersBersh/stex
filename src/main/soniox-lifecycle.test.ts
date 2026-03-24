@@ -83,6 +83,7 @@ function createMockCallbacks() {
     onStatusChange: vi.fn(),
     onError: vi.fn(),
     onFinalizationComplete: vi.fn(),
+    onAudioLevel: vi.fn(),
   };
 }
 
@@ -246,6 +247,16 @@ describe('soniox-lifecycle', () => {
 
       expect(mockAudio.stopCapture).toHaveBeenCalled();
     });
+
+    it('resets audio level to MIN_DB on disconnect', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+
+      triggerOnDisconnected(1006, 'connection lost');
+
+      expect(callbacks.onAudioLevel).toHaveBeenCalledWith(-60);
+    });
   });
 
   describe('error handling', () => {
@@ -258,6 +269,27 @@ describe('soniox-lifecycle', () => {
       triggerOnError(new Error('something broke'));
 
       expect(callbacks.onStatusChange).toHaveBeenCalledWith('error');
+    });
+
+    it('resets audio level to MIN_DB on Soniox error', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+
+      triggerOnError(new Error('something broke'));
+
+      expect(callbacks.onAudioLevel).toHaveBeenCalledWith(-60);
+    });
+
+    it('resets audio level to MIN_DB on audio capture error', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+
+      const onAudioError = mockAudio.startCapture.mock.calls[0][1] as (err: Error) => void;
+      onAudioError(new Error('mic unplugged'));
+
+      expect(callbacks.onAudioLevel).toHaveBeenCalledWith(-60);
     });
   });
 

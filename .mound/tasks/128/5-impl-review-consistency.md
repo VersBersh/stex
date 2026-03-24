@@ -1,0 +1,12 @@
+- **Verdict** — `Approved with Notes`
+
+- **Progress**
+  - [x] Step 1 — done: `MIN_DB` is exported from [src/main/audio-level-monitor.ts#L1](C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/audio-level-monitor.ts#L1).
+  - [x] Step 2 — done: reset calls were added in [src/main/soniox-lifecycle.ts#L75](C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/soniox-lifecycle.ts#L75), [src/main/soniox-lifecycle.ts#L103](C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/soniox-lifecycle.ts#L103), and [src/main/soniox-lifecycle.ts#L161](C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/soniox-lifecycle.ts#L161).
+  - [x] Step 3 — done: reset IPC sends were added in [src/main/session.ts#L112](C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/session.ts#L112), [src/main/session.ts#L147](C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/session.ts#L147), and [src/main/session.ts#L214](C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/session.ts#L214).
+  - [ ] Step 4 — partially done: tests cover disconnect/WebSocket error plus pause/stop/quick dismiss, but the audio-capture error path in `onAudioError()` is still untested.
+
+- **Issues**
+  1. Minor — Missing planned coverage for the audio-capture error reset. The implementation does reset the meter in [src/main/soniox-lifecycle.ts#L103](C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/soniox-lifecycle.ts#L103), but the added tests in [src/main/soniox-lifecycle.test.ts#L262](C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/soniox-lifecycle.test.ts#L262) only exercise the Soniox/WebSocket `onError` path, not the audio-layer `onAudioError` callback passed to `startCapture()`. That leaves one `stopCapture()` reset path from the plan unverified. Suggested fix: add a test that captures the `startCapture` error callback and asserts `onAudioLevel(-60)` is emitted when the audio layer errors.
+
+The code changes themselves are coherent and match the intended design: every real `stopCapture()` path in `session.ts` and `soniox-lifecycle.ts` now emits an explicit reset, and I did not find any unplanned behavioral regression in the surrounding renderer/session flow.

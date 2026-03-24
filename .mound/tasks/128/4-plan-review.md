@@ -1,0 +1,21 @@
+**Verdict** — `Needs Revision`
+
+**Plan Issues**
+1. Major — **Step 4 adds a renderer-owned auto-decay that does not match the current architecture and can show false zero levels while the session is still recording.** Today the main process is the source of truth for audio level updates via `onAudioLevel` and `AUDIO_LEVEL` IPC in [soniox-lifecycle.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/soniox-lifecycle.ts#L93) and [session.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/session.ts#L64). A 500ms renderer timer in [OverlayContext.tsx](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/renderer/overlay/OverlayContext.tsx#L125) would introduce a second authority and can drop the meter to `-60` during transient stalls or delayed IPC even though capture is still active. The explicit reset sends in Steps 2-3 already address the real stale-meter windows.  
+   Suggested fix: remove Step 4 unless there is a proven missed-reset path after explicit resets are added.
+
+2. Major — **Step 5 is based on an incorrect claim and targets the wrong place.** The meter already has a CSS transition in [overlay.css](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/renderer/overlay/overlay.css#L167), and the UI spec already requires it in [spec/ui.md](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/spec/ui.md#L89). [VolumeMeter.tsx](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/renderer/overlay/components/VolumeMeter.tsx#L15) is correctly just computing width and color.  
+   Suggested fix: drop Step 5. If transition timing needs tuning, change the existing CSS rule instead of adding an inline style.
+
+3. Major — **The plan is incomplete on verification.** The reset behavior affects the flows already covered by [session.test.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/session.test.ts), [session-reconnect.test.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/session-reconnect.test.ts), and [soniox-lifecycle.test.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/main/soniox-lifecycle.test.ts), but the plan adds no test step. As written, Steps 2-3 would change observable IPC/callback output on pause, stop, quick dismiss, disconnect, and error.  
+   Suggested fix: add a test step covering `AUDIO_LEVEL` reset on those paths; only add renderer tests if Step 4 is kept.
+
+4. Minor — **The plan duplicates the reset constant in the renderer.** Step 4 hardcodes `-60` in [OverlayContext.tsx](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/src/renderer/overlay/OverlayContext.tsx#L37) even while Step 1 is exporting `MIN_DB` from a main-only module. That creates another drift point.  
+   Suggested fix: avoid Step 4; if a shared reset value is truly needed on both sides, move it to a shared module instead of importing from `src/main` or hardcoding it again.
+
+**Spec Update Issues**
+1. Major — **`2-spec-updates.md` is only correct if Step 4 is removed.** The current file says “No spec updates required,” but the proposed auto-decay would be a new user-visible behavior during `recording`: the meter could reset after 500ms without a status change. That is not described in [spec/ui.md](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/spec/ui.md#L83) or [spec/features/realtime-transcription.md](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/spec/features/realtime-transcription.md).  
+   Suggested fix: either remove Step 4 and keep “no spec updates required,” or add spec text describing the fallback decay/reset behavior and why it exists.
+
+2. Minor — **The spec update note understates that one part of the plan is already specified.** [spec/ui.md](/C:/code/draftable/stex/.mound/worktrees/worker-1-2570bb61/spec/ui.md#L89) already requires the volume meter to be “animated with CSS transition,” so Step 5 is not a spec gap.  
+   Suggested fix: clarify that no spec change is needed for transition behavior because it is already covered, and treat any work there as implementation cleanup only.

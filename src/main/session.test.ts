@@ -405,6 +405,15 @@ describe('Session Manager', () => {
       });
     });
 
+    it('resets audio level to MIN_DB on pause', () => {
+      triggerPauseIpc();
+
+      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+        IpcChannels.AUDIO_LEVEL,
+        -60,
+      );
+    });
+
     it('does not disconnect WebSocket on pause', async () => {
       triggerPauseIpc();
       triggerOnFinished();
@@ -483,6 +492,15 @@ describe('Session Manager', () => {
       requestToggle();
 
       expect(mockAudio.stopCapture).toHaveBeenCalled();
+    });
+
+    it('resets audio level to MIN_DB on stop', () => {
+      requestToggle();
+
+      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+        IpcChannels.AUDIO_LEVEL,
+        -60,
+      );
     });
 
     it('sends finalize to Soniox on stop', () => {
@@ -835,6 +853,15 @@ describe('Session Manager', () => {
       expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
         IpcChannels.TOKENS_NONFINAL,
         [],
+      );
+    });
+
+    it('resets audio level to MIN_DB on quick dismiss', () => {
+      requestQuickDismiss();
+
+      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+        IpcChannels.AUDIO_LEVEL,
+        -60,
       );
     });
 
