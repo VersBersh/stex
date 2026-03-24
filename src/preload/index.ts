@@ -92,6 +92,20 @@ const api: ElectronAPI = {
     ipcRenderer.on(IpcChannels.AUDIO_LEVEL, handler);
     return () => { ipcRenderer.removeListener(IpcChannels.AUDIO_LEVEL, handler); };
   },
+
+  // Audio capture (Main → Renderer commands, Renderer → Main data)
+  onAudioStartCapture: (callback: (deviceName: string | null) => void) => {
+    const handler = (_event: unknown, deviceName: string | null) => callback(deviceName);
+    ipcRenderer.on(IpcChannels.AUDIO_START_CAPTURE, handler);
+    return () => { ipcRenderer.removeListener(IpcChannels.AUDIO_START_CAPTURE, handler); };
+  },
+  onAudioStopCapture: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on(IpcChannels.AUDIO_STOP_CAPTURE, handler);
+    return () => { ipcRenderer.removeListener(IpcChannels.AUDIO_STOP_CAPTURE, handler); };
+  },
+  sendAudioChunk: (buffer: ArrayBuffer) => ipcRenderer.send(IpcChannels.AUDIO_CHUNK, Buffer.from(buffer)),
+  sendAudioCaptureError: (message: string) => ipcRenderer.send(IpcChannels.AUDIO_CAPTURE_ERROR, message),
 };
 
 contextBridge.exposeInMainWorld('api', api);

@@ -5,6 +5,7 @@ import { $getDocumentText } from './editor/lexicalTextContract';
 import { createPauseController } from './pauseController';
 import type { ErrorInfo, SessionState } from '../../shared/types';
 import { createSessionLifecycleController } from './sessionLifecycleController';
+import { startAudioCapture, stopAudioCapture } from './audio-capture';
 
 interface OverlayContextValue {
   confirmingClear: boolean;
@@ -199,6 +200,25 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+
+  // Audio capture: listen for start/stop commands from main process
+  useEffect(() => {
+    const unsubStart = window.api.onAudioStartCapture(async (deviceName) => {
+      try {
+        await startAudioCapture(
+          deviceName,
+          (buffer) => window.api.sendAudioChunk(buffer),
+          (err) => window.api.sendAudioCaptureError(err.message),
+        );
+      } catch (err) {
+        window.api.sendAudioCaptureError((err as Error).message);
+      }
+    });
+    const unsubStop = window.api.onAudioStopCapture(() => {
+      stopAudioCapture();
+    });
+    return () => { unsubStart(); unsubStop(); };
+  }, []);
 
   // Window-level keyboard shortcuts
   useEffect(() => {

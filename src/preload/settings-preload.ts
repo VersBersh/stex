@@ -17,7 +17,22 @@ const settingsApi: SettingsAPI = {
     return () => { ipcRenderer.removeListener(IpcChannels.SETTINGS_UPDATED, handler); };
   },
 
-  getAudioDevices: () => ipcRenderer.invoke(IpcChannels.AUDIO_GET_DEVICES),
+  getAudioDevices: async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+    } catch {
+      // Permission denied — labels may be empty
+    }
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices
+        .filter(d => d.kind === 'audioinput' && d.label)
+        .map(d => d.label);
+    } catch {
+      return [];
+    }
+  },
 
   getResolvedTheme: () => ipcRenderer.invoke(IpcChannels.THEME_GET),
 

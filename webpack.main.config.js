@@ -28,7 +28,6 @@ module.exports = {
   externals: {
     electron: 'commonjs electron',
     'electron-store': 'commonjs electron-store',
-    naudiodon: 'commonjs naudiodon',
     ws: 'commonjs ws',
   },
   node: {

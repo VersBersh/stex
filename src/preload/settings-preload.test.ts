@@ -62,16 +62,9 @@ describe('Settings preload bridge', () => {
       expect(mockInvoke).toHaveBeenCalledWith('settings:set', 'theme', 'dark');
     });
 
-    it('exposes getAudioDevices', () => {
+    it('exposes getAudioDevices as a function', () => {
       const api = exposed.settingsApi as Record<string, (...args: unknown[]) => unknown>;
       expect(typeof api.getAudioDevices).toBe('function');
-    });
-
-    it('getAudioDevices calls ipcRenderer.invoke with correct channel', async () => {
-      const api = exposed.settingsApi as Record<string, (...args: unknown[]) => unknown>;
-      mockInvoke.mockResolvedValue(['Microphone 1', 'Microphone 2']);
-      await api.getAudioDevices();
-      expect(mockInvoke).toHaveBeenCalledWith('audio:get-devices');
     });
 
     it('exposes getResolvedTheme', () => {

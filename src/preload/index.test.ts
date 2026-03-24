@@ -143,6 +143,8 @@ describe('Preload bridge', () => {
       'onThemeChanged',
       'onSessionError',
       'onAudioLevel',
+      'onAudioStartCapture',
+      'onAudioStopCapture',
     ];
 
     for (const method of listenerMethods) {
@@ -263,6 +265,31 @@ describe('Preload bridge', () => {
       const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
       api.log('error', 'something broke');
       expect(mockSend).toHaveBeenCalledWith('log:from-renderer', 'error', 'something broke');
+    });
+  });
+
+  describe('audio capture send methods', () => {
+    it('exposes sendAudioChunk', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      expect(typeof api.sendAudioChunk).toBe('function');
+    });
+
+    it('sendAudioChunk calls ipcRenderer.send with audio:chunk', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      const buffer = new ArrayBuffer(3200);
+      api.sendAudioChunk(buffer);
+      expect(mockSend).toHaveBeenCalledWith('audio:chunk', expect.any(Buffer));
+    });
+
+    it('exposes sendAudioCaptureError', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      expect(typeof api.sendAudioCaptureError).toBe('function');
+    });
+
+    it('sendAudioCaptureError calls ipcRenderer.send with audio:capture-error', () => {
+      const api = exposed.api as Record<string, (...args: unknown[]) => unknown>;
+      api.sendAudioCaptureError('Microphone access denied');
+      expect(mockSend).toHaveBeenCalledWith('audio:capture-error', 'Microphone access denied');
     });
   });
 

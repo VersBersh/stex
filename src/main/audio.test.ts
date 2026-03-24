@@ -1,62 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EventEmitter } from 'events';
 
-const { mockDevices, mockSettings, lastCreatedStream, mockGetDevices, SampleFormat16Bit, mockHandlers } = vi.hoisted(() => {
-  const mockDevices = [
-    { id: 0, name: 'Built-in Microphone', maxInputChannels: 2, maxOutputChannels: 0, defaultSampleRate: 44100, hostAPIName: 'Windows WASAPI' },
-    { id: 1, name: 'USB Headset', maxInputChannels: 1, maxOutputChannels: 2, defaultSampleRate: 48000, hostAPIName: 'Windows WASAPI' },
-    { id: 2, name: 'Speakers', maxInputChannels: 0, maxOutputChannels: 2, defaultSampleRate: 44100, hostAPIName: 'Windows WASAPI' },
-    { id: 3, name: 'Virtual Cable', maxInputChannels: 2, maxOutputChannels: 2, defaultSampleRate: 44100, hostAPIName: 'Windows WASAPI' },
-  ];
-
+const { mockSettings, mockHandlers, mockSendToRenderer } = vi.hoisted(() => {
   const mockSettings = {
     audioInputDevice: null as string | null,
   };
 
-  const lastCreatedStream = { value: null as null | {
-    options: unknown;
-    started: boolean;
-    stopped: boolean;
-    emit: (event: string, ...args: unknown[]) => boolean;
-  } };
-
-  const mockGetDevices = vi.fn(() => [...mockDevices]);
-  const SampleFormat16Bit = 16;
-
   const mockHandlers = new Map<string, (...args: unknown[]) => unknown>();
+  const mockSendToRenderer = vi.fn();
 
-  return { mockDevices, mockSettings, lastCreatedStream, mockGetDevices, SampleFormat16Bit, mockHandlers };
-});
-
-vi.mock('naudiodon', () => {
-  // naudiodon's AudioIO is a factory function, not a class
-  function MockAudioIO(options: unknown) {
-    const emitter = Object.assign(new EventEmitter(), {
-      options,
-      started: false,
-      stopped: false,
-      start() { this.started = true; },
-      quit() { this.stopped = true; },
-    });
-    lastCreatedStream.value = emitter;
-    return emitter;
-  }
-
-  return {
-    default: {
-      AudioIO: MockAudioIO,
-      getDevices: mockGetDevices,
-      SampleFormat16Bit,
-    },
-    AudioIO: MockAudioIO,
-    getDevices: mockGetDevices,
-    SampleFormat16Bit,
-  };
+  return { mockSettings, mockHandlers, mockSendToRenderer };
 });
 
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
+    on: (channel: string, handler: (...args: unknown[]) => unknown) => {
       mockHandlers.set(channel, handler);
     },
   },
@@ -66,129 +23,42 @@ vi.mock('./settings', () => ({
   getSettings: () => mockSettings,
 }));
 
+vi.mock('./renderer-send', () => ({
+  sendToRenderer: (...args: unknown[]) => mockSendToRenderer(...args),
+}));
+
 vi.mock('./logger');
 
-import { listDevices, startCapture, stopCapture, registerAudioIpc } from './audio';
+import { startCapture, stopCapture, registerAudioIpc } from './audio';
 import { IpcChannels } from '../shared/ipc';
-
-describe('listDevices', () => {
-  beforeEach(() => {
-    mockGetDevices.mockReturnValue([...mockDevices]);
-  });
-
-  it('returns only devices with input channels', () => {
-    const devices = listDevices();
-    expect(devices).toHaveLength(3);
-    expect(devices.every(d => d.maxInputChannels > 0)).toBe(true);
-  });
-
-  it('excludes output-only devices', () => {
-    const devices = listDevices();
-    const names = devices.map(d => d.name);
-    expect(names).not.toContain('Speakers');
-  });
-
-  it('maps to AudioDevice shape', () => {
-    const devices = listDevices();
-    expect(devices[0]).toEqual({
-      id: 0,
-      name: 'Built-in Microphone',
-      maxInputChannels: 2,
-      defaultSampleRate: 44100,
-    });
-  });
-
-  it('filters to WASAPI devices when available', () => {
-    mockGetDevices.mockReturnValue([
-      { id: 0, name: 'Mic', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 44100, hostAPIName: 'MME' },
-      { id: 1, name: 'Mic', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 44100, hostAPIName: 'Windows WASAPI' },
-      { id: 2, name: 'Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'MME' },
-      { id: 3, name: 'Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'Windows WASAPI' },
-    ]);
-    const devices = listDevices();
-    expect(devices).toHaveLength(2);
-    expect(devices.map(d => d.id)).toEqual([1, 3]);
-  });
-
-  it('falls back to all devices when no WASAPI devices exist', () => {
-    mockGetDevices.mockReturnValue([
-      { id: 0, name: 'Mic', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 44100, hostAPIName: 'MME' },
-      { id: 1, name: 'Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'MME' },
-    ]);
-    const devices = listDevices();
-    expect(devices).toHaveLength(2);
-  });
-});
 
 describe('startCapture', () => {
   beforeEach(() => {
     mockSettings.audioInputDevice = null;
-    mockGetDevices.mockReturnValue([...mockDevices]);
-    lastCreatedStream.value = null;
+    mockSendToRenderer.mockClear();
     stopCapture();
   });
 
-  it('creates AudioIO with correct PCM s16le 16kHz mono parameters', () => {
+  it('sends AUDIO_START_CAPTURE to renderer with device name', () => {
+    mockSettings.audioInputDevice = 'USB Headset';
     startCapture(vi.fn(), vi.fn());
 
-    const stream = lastCreatedStream.value!;
-    const opts = (stream.options as { inOptions: Record<string, unknown> }).inOptions;
-    expect(opts.channelCount).toBe(1);
-    expect(opts.sampleFormat).toBe(SampleFormat16Bit);
-    expect(opts.sampleRate).toBe(16000);
+    expect(mockSendToRenderer).toHaveBeenCalledWith(
+      IpcChannels.AUDIO_START_CAPTURE,
+      'USB Headset',
+    );
     stopCapture();
   });
 
-  it('uses default device (-1) when audioInputDevice is null', () => {
+  it('sends null device name when audioInputDevice is null', () => {
     mockSettings.audioInputDevice = null;
     startCapture(vi.fn(), vi.fn());
 
-    const stream = lastCreatedStream.value!;
-    const opts = (stream.options as { inOptions: Record<string, unknown> }).inOptions;
-    expect(opts.deviceId).toBe(-1);
+    expect(mockSendToRenderer).toHaveBeenCalledWith(
+      IpcChannels.AUDIO_START_CAPTURE,
+      null,
+    );
     stopCapture();
-  });
-
-  it('resolves device by name from settings', () => {
-    mockSettings.audioInputDevice = 'USB Headset';
-    startCapture(vi.fn(), vi.fn());
-
-    const stream = lastCreatedStream.value!;
-    const opts = (stream.options as { inOptions: Record<string, unknown> }).inOptions;
-    expect(opts.deviceId).toBe(1);
-    stopCapture();
-  });
-
-  it('prefers WASAPI device when multiple host APIs match the same name', () => {
-    mockGetDevices.mockReturnValue([
-      { id: 5, name: 'USB Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'MME' },
-      { id: 6, name: 'USB Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'Windows WASAPI' },
-    ]);
-    mockSettings.audioInputDevice = 'USB Headset';
-    startCapture(vi.fn(), vi.fn());
-
-    const stream = lastCreatedStream.value!;
-    const opts = (stream.options as { inOptions: Record<string, unknown> }).inOptions;
-    expect(opts.deviceId).toBe(6);
-    stopCapture();
-  });
-
-  it('falls back to non-WASAPI device when no WASAPI match exists', () => {
-    mockGetDevices.mockReturnValue([
-      { id: 5, name: 'USB Headset', maxInputChannels: 1, maxOutputChannels: 0, defaultSampleRate: 48000, hostAPIName: 'MME' },
-    ]);
-    mockSettings.audioInputDevice = 'USB Headset';
-    startCapture(vi.fn(), vi.fn());
-
-    const stream = lastCreatedStream.value!;
-    const opts = (stream.options as { inOptions: Record<string, unknown> }).inOptions;
-    expect(opts.deviceId).toBe(5);
-    stopCapture();
-  });
-
-  it('throws when configured device name is not found', () => {
-    mockSettings.audioInputDevice = 'Nonexistent Device';
-    expect(() => startCapture(vi.fn(), vi.fn())).toThrow('Audio device not found: Nonexistent Device');
   });
 
   it('throws when called while already capturing', () => {
@@ -196,41 +66,27 @@ describe('startCapture', () => {
     expect(() => startCapture(vi.fn(), vi.fn())).toThrow('Audio capture is already active');
     stopCapture();
   });
-
-  it('calls onData when stream emits data', () => {
-    const onData = vi.fn();
-    startCapture(onData, vi.fn());
-
-    const chunk = Buffer.alloc(3200);
-    lastCreatedStream.value!.emit('data', chunk);
-    expect(onData).toHaveBeenCalledWith(chunk);
-    stopCapture();
-  });
-
-  it('starts the stream', () => {
-    startCapture(vi.fn(), vi.fn());
-    expect(lastCreatedStream.value!.started).toBe(true);
-    stopCapture();
-  });
 });
 
 describe('stopCapture', () => {
   beforeEach(() => {
     mockSettings.audioInputDevice = null;
-    mockGetDevices.mockReturnValue([...mockDevices]);
-    lastCreatedStream.value = null;
+    mockSendToRenderer.mockClear();
     stopCapture();
   });
 
-  it('calls quit on the active stream', () => {
+  it('sends AUDIO_STOP_CAPTURE to renderer', () => {
     startCapture(vi.fn(), vi.fn());
-    const stream = lastCreatedStream.value!;
+    mockSendToRenderer.mockClear();
     stopCapture();
-    expect(stream.stopped).toBe(true);
+
+    expect(mockSendToRenderer).toHaveBeenCalledWith(IpcChannels.AUDIO_STOP_CAPTURE);
   });
 
   it('is a no-op when not capturing', () => {
-    expect(() => stopCapture()).not.toThrow();
+    mockSendToRenderer.mockClear();
+    stopCapture();
+    expect(mockSendToRenderer).not.toHaveBeenCalled();
   });
 
   it('allows starting a new capture after stopping', () => {
@@ -241,52 +97,74 @@ describe('stopCapture', () => {
   });
 });
 
-describe('stream error handling', () => {
-  beforeEach(() => {
-    mockSettings.audioInputDevice = null;
-    mockGetDevices.mockReturnValue([...mockDevices]);
-    lastCreatedStream.value = null;
-    stopCapture();
-  });
-
-  it('calls onError and stops capture when stream emits error', () => {
-    const onError = vi.fn();
-    startCapture(vi.fn(), onError);
-
-    const stream = lastCreatedStream.value!;
-    const error = new Error('Device disconnected');
-    stream.emit('error', error);
-
-    expect(onError).toHaveBeenCalledWith(error);
-    expect(stream.stopped).toBe(true);
-  });
-
-  it('allows restarting after a stream error', () => {
-    const onError = vi.fn();
-    startCapture(vi.fn(), onError);
-
-    lastCreatedStream.value!.emit('error', new Error('Device disconnected'));
-
-    expect(() => startCapture(vi.fn(), vi.fn())).not.toThrow();
-    stopCapture();
-  });
-});
-
 describe('registerAudioIpc', () => {
   beforeEach(() => {
     mockHandlers.clear();
+    mockSendToRenderer.mockClear();
+    stopCapture();
   });
 
-  it('registers a handler for AUDIO_GET_DEVICES', () => {
+  it('registers handlers for AUDIO_CHUNK and AUDIO_CAPTURE_ERROR', () => {
     registerAudioIpc();
-    expect(mockHandlers.has(IpcChannels.AUDIO_GET_DEVICES)).toBe(true);
+    expect(mockHandlers.has(IpcChannels.AUDIO_CHUNK)).toBe(true);
+    expect(mockHandlers.has(IpcChannels.AUDIO_CAPTURE_ERROR)).toBe(true);
   });
 
-  it('AUDIO_GET_DEVICES handler returns input device names', async () => {
-    mockGetDevices.mockReturnValue([...mockDevices]);
+  it('AUDIO_CHUNK handler calls onData callback with buffer', () => {
     registerAudioIpc();
-    const handler = mockHandlers.get(IpcChannels.AUDIO_GET_DEVICES)!;
-    const result = await handler({});
-    expect(result).toEqual(['Built-in Microphone', 'USB Headset', 'Virtual Cable']);
+    const onData = vi.fn();
+    startCapture(onData, vi.fn());
+
+    const chunk = Buffer.alloc(3200);
+    const handler = mockHandlers.get(IpcChannels.AUDIO_CHUNK)!;
+    handler({}, chunk);
+
+    expect(onData).toHaveBeenCalledWith(chunk);
+    stopCapture();
+  });
+
+  it('AUDIO_CHUNK handler is a no-op when not capturing', () => {
+    registerAudioIpc();
+    const handler = mockHandlers.get(IpcChannels.AUDIO_CHUNK)!;
+
+    // Should not throw
+    expect(() => handler({}, Buffer.alloc(100))).not.toThrow();
+  });
+
+  it('AUDIO_CAPTURE_ERROR handler sends stop to renderer before calling onError', () => {
+    registerAudioIpc();
+    const onError = vi.fn();
+    startCapture(vi.fn(), onError);
+    mockSendToRenderer.mockClear();
+
+    const handler = mockHandlers.get(IpcChannels.AUDIO_CAPTURE_ERROR)!;
+    handler({}, 'Microphone access denied');
+
+    // Should have sent stop command to renderer
+    expect(mockSendToRenderer).toHaveBeenCalledWith(IpcChannels.AUDIO_STOP_CAPTURE);
+    // Should have called onError
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Microphone access denied',
+    }));
+  });
+
+  it('AUDIO_CAPTURE_ERROR handler clears capturing state', () => {
+    registerAudioIpc();
+    startCapture(vi.fn(), vi.fn());
+
+    const handler = mockHandlers.get(IpcChannels.AUDIO_CAPTURE_ERROR)!;
+    handler({}, 'Device disconnected');
+
+    // Should be able to start again (not throw "already active")
+    expect(() => startCapture(vi.fn(), vi.fn())).not.toThrow();
+    stopCapture();
+  });
+
+  it('AUDIO_CAPTURE_ERROR handler is a no-op when not capturing', () => {
+    registerAudioIpc();
+    const handler = mockHandlers.get(IpcChannels.AUDIO_CAPTURE_ERROR)!;
+
+    // Should not throw
+    expect(() => handler({}, 'some error')).not.toThrow();
   });
 });

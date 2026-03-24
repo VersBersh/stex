@@ -59,13 +59,6 @@ export interface AppSettings {
   windowSize: { width: number; height: number };
 }
 
-export interface AudioDevice {
-  id: number;
-  name: string;
-  maxInputChannels: number;
-  defaultSampleRate: number;
-}
-
 export const SILENCE_THRESHOLD_MIN = -60;
 export const SILENCE_THRESHOLD_MAX = -10;
 
