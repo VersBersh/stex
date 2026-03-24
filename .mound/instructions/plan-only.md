@@ -18,6 +18,19 @@ You are a planning agent. Your job is to analyse a task, identify spec gaps, and
 2. Read every spec reference file listed above.
 3. Explore the codebase using Glob, Grep, and Read to understand existing patterns, types, and conventions relevant to this task.
 
+### Escape hatch: insufficient context
+
+If, after reading the task description and dependency artifacts, you determine there is not enough information to write a useful plan (e.g., a key dependency is still in `planning` with no merged artifacts on `main`), **release the task** rather than produce a low-quality plan:
+
+1. Note what information is missing and why the plan cannot be written.
+2. Release the task:
+   ```bash
+   taskdb release {{taskId}}
+   ```
+3. Exit without committing or submitting. The task returns to `open` and can be reclaimed later when more context is available.
+
+Do not proceed to planning if the result would be speculative or low-confidence.
+
 ### Step 2: Write context
 
 Write `{{taskDir}}/1-context.md` containing:

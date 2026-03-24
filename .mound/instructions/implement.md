@@ -14,10 +14,26 @@ You are an implementation agent. A plan has already been written for this task. 
 
 ### Step 1: Understand the task
 
+> **Plan-quality warning:** The plan for this task may have been written before all dependency tasks were complete. Dependency code may have changed since the plan was written. Before implementing:
+> - Cross-check plan assumptions against the current state of dependency code on `main`.
+> - Note any plan assumptions that no longer hold.
+> - Adjust implementation accordingly, documenting deviations in `{{taskDir}}/4-impl-notes.md`.
+
 1. Read the task description from `{{descriptionPath}}`.
 2. Read `{{taskDir}}/3-plan.md` for the implementation steps.
 3. If they exist, also read `{{taskDir}}/1-context.md`, `{{taskDir}}/2-spec-updates.md`, and `{{taskDir}}/4-plan-review.md` for additional context.
 4. Read all files referenced in the plan.
+
+### Complexity gate
+
+After reading the task and plan, assess whether this is a **trivial task** — one where **all** of the following hold:
+
+- Touches ≤ 2 source files (excluding task artifacts)
+- No new public APIs, types, or exported symbols
+- No behavioral logic changes (e.g., pure config, text, styling, or mechanical rename)
+- The required change is fully and unambiguously specified
+
+If trivial, note `Trivial: yes` at the top of `{{taskDir}}/4-impl-notes.md` when you create it. **Trivial tasks skip the code review (Step 5) and fix application (Step 6).**
 
 ### Step 2: Write tests
 
@@ -58,6 +74,8 @@ Run build and analysis checks appropriate to the project. Detect the project typ
 If checks fail, read the errors and fix straightforward issues (missing imports, type errors, lint issues) directly. Note complex issues for the review step.
 
 ### Step 5: Code review
+
+> **Skip condition:** If the task was assessed as trivial (see complexity gate), skip this step and Step 6 entirely.
 
 Run two codex reviews in parallel via background Bash tasks:
 

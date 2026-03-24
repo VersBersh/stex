@@ -18,6 +18,17 @@ You are an implementation agent. Your job is to analyse a task, produce a review
 2. Read every spec reference file listed above.
 3. Explore the codebase using Glob, Grep, and Read to understand existing patterns, types, and conventions relevant to this task.
 
+### Complexity gate
+
+After reading the task and specs, assess whether this is a **trivial task** — one where **all** of the following hold:
+
+- Touches ≤ 2 source files (excluding task artifacts)
+- No new public APIs, types, or exported symbols
+- No behavioral logic changes (e.g., pure config, text, styling, or mechanical rename)
+- The required change is fully and unambiguously specified
+
+If trivial, note `Trivial: yes` at the top of `{{taskDir}}/4-impl-notes.md` when you create it. **Trivial tasks skip the plan review (Step 5), plan revision (Step 6), code review (Step 10), and fix application (Step 11).**
+
 ### Step 2: Write context
 
 Write `{{taskDir}}/1-context.md` containing:
@@ -41,6 +52,8 @@ Write `{{taskDir}}/3-plan.md` containing:
 Be specific about file paths, function signatures, and data structures. Reference existing patterns in the codebase that the implementation should follow.
 
 ### Step 5: Plan review
+
+> **Skip condition:** If the task was assessed as trivial (see complexity gate), skip this step and Step 6 entirely.
 
 Run a plan review via codex (provides model-diversity feedback):
 
@@ -120,6 +133,8 @@ Run build and analysis checks appropriate to the project. Detect the project typ
 If checks fail, read the errors and fix straightforward issues (missing imports, type errors, lint issues) directly. Note complex issues for the review step.
 
 ### Step 10: Code review
+
+> **Skip condition:** If the task was assessed as trivial (see complexity gate), skip this step and Step 11 entirely.
 
 Run two codex reviews in parallel via background Bash tasks:
 
