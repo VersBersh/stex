@@ -1,0 +1,13 @@
+**Verdict** — `Needs Revision`
+
+**Plan Issues**
+1. Major — Step 1 (`startup timing`) is not implementable as written. The plan says to emit `debug('initApp: start')` at function entry, but `debug` is filtered until `initLogger()` sets the level; the logger defaults to `info` before that. See [src/main/index.ts#L13](/C:/code/draftable/stex/.mound/worktrees/worker-2-d6155a24/src/main/index.ts#L13) and [src/main/logger.ts#L22](/C:/code/draftable/stex/.mound/worktrees/worker-2-d6155a24/src/main/logger.ts#L22), [src/main/logger.ts#L43](/C:/code/draftable/stex/.mound/worktrees/worker-2-d6155a24/src/main/logger.ts#L43), [src/main/logger.ts#L57](/C:/code/draftable/stex/.mound/worktrees/worker-2-d6155a24/src/main/logger.ts#L57). Fix: capture the entry timestamp immediately, then log it in the first message after `initLogger()`, or use a non-filtered mechanism for the pre-init marker.
+
+2. Major — Step 2 (`Soniox config logging`) introduces a privacy and log-volume regression the plan does not acknowledge. The proposed `%j` dump of the full config minus `api_key` will still persist `context.text`, which can contain up to 9000 chars of prior editor/transcript content. See [src/main/soniox.ts#L67](/C:/code/draftable/stex/.mound/worktrees/worker-2-d6155a24/src/main/soniox.ts#L67), [src/main/soniox.ts#L75](/C:/code/draftable/stex/.mound/worktrees/worker-2-d6155a24/src/main/soniox.ts#L75), and [spec/api.md#L50](/C:/code/draftable/stex/.mound/worktrees/worker-2-d6155a24/spec/api.md#L50). Fix: either explicitly accept that risk in the task/spec, or log a sanitized shape such as `has_context` and `context_length` rather than raw `context.text`.
+
+3. Minor — Step 4 overstates current behavior and should be tightened. The note says dB is already computed “on every chunk when `levelMonitor` is active,” but the current code only computes it when both `levelMonitor` and `activeCallbacks?.onAudioLevel` are present. See [src/main/soniox-lifecycle.ts#L93](/C:/code/draftable/stex/.mound/worktrees/worker-2-d6155a24/src/main/soniox-lifecycle.ts#L93) and [src/main/audio-level-monitor.ts#L3](/C:/code/draftable/stex/.mound/worktrees/worker-2-d6155a24/src/main/audio-level-monitor.ts#L3). Fix: either state explicitly that the logging path intentionally adds standalone dB computation even without an audio-level subscriber, or gate the periodic log behind the existing branch if that extra work is not desired.
+
+**Spec Update Issues**
+None. `2-spec-updates.md` is accurate for the current scope: the proposed work is debug-only logging and does not require changes to shared types, IPC contracts, or the Soniox protocol specs.
+
+Review based on source/spec inspection; I did not run `npm test` or `npm run build`.

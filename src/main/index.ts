@@ -7,21 +7,36 @@ import { initHotkeyManager } from './hotkey';
 import { registerAudioIpc } from './audio';
 import { initThemeManager } from './theme';
 import { initSessionManager } from './session';
-import { initLogger } from './logger';
+import { initLogger, debug } from './logger';
 import { registerLogIpc } from './log-ipc';
 
 export function initApp(): void {
+  const t0 = performance.now();
   const logDir = path.join(app.getPath('userData'), 'logs');
   initLogger({ logDir, level: app.isPackaged ? 'info' : 'debug' });
   registerLogIpc();
+  debug('initApp: logger initialized (%.0fms)', performance.now() - t0);
 
   registerSettingsIpc();
+  debug('initApp: settings IPC registered (%.0fms)', performance.now() - t0);
+
   registerAudioIpc();
+  debug('initApp: audio IPC registered (%.0fms)', performance.now() - t0);
+
   initThemeManager();
+  debug('initApp: theme manager initialized (%.0fms)', performance.now() - t0);
+
   initWindowManager();
+  debug('initApp: window manager initialized (%.0fms)', performance.now() - t0);
+
   initSessionManager();
+  debug('initApp: session manager initialized (%.0fms)', performance.now() - t0);
+
   initTray();
+  debug('initApp: tray initialized (%.0fms)', performance.now() - t0);
+
   initHotkeyManager();
+  debug('initApp: hotkey manager initialized (%.0fms)', performance.now() - t0);
 
   // First-run: auto-open settings if no API key configured
   const settings = getSettings();

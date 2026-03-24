@@ -85,8 +85,8 @@ export class SonioxClient {
         ...(trimmedContext ? { context: { text: trimmedContext } } : {}),
       };
 
-      debug('Soniox config: model=%s, language=%s, max_endpoint_delay_ms=%d',
-        config.model, config.language_hints[0], config.max_endpoint_delay_ms);
+      const { api_key: _, context: ctx, ...safeConfig } = config;
+      debug('Soniox config: %j context_length=%d', safeConfig, ctx?.text?.length ?? 0);
       socket.send(JSON.stringify(config));
       this.events.onConnected?.();
     });
@@ -155,6 +155,9 @@ export class SonioxClient {
     const nonFinalTokens = contentTokens.filter((t) => !t.is_final);
 
     this._hasPendingNonFinalTokens = nonFinalTokens.length > 0;
+
+    debug('Soniox msg: tokens=%d final=%d non-final=%d finished=%s',
+      contentTokens.length, newFinalTokens.length, nonFinalTokens.length, !!response.finished);
 
     if (newFinalTokens.length > 0) {
       this.events.onFinalTokens?.(newFinalTokens);

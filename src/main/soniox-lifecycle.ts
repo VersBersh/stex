@@ -22,6 +22,7 @@ let reconnectAttempt = 0;
 let activeCallbacks: SonioxLifecycleCallbacks | null = null;
 let storedContextText: string | null = null;
 let levelMonitor: AudioLevelMonitor | null = null;
+let audioChunkCount = 0;
 
 export function isConnected(): boolean {
   return soniox?.connected ?? false;
@@ -55,6 +56,7 @@ export function resetLifecycle(): void {
   soniox = null;
   storedContextText = null;
   levelMonitor = null;
+  audioChunkCount = 0;
 }
 
 function scheduleReconnect(): void {
@@ -92,6 +94,11 @@ function handleDisconnect(code: number, reason: string): void {
 
 function onAudioData(chunk: Buffer): void {
   soniox?.sendAudio(chunk);
+  audioChunkCount++;
+  if (audioChunkCount % 100 === 0) {
+    const logDb = computeDbFromPcm16(chunk);
+    debug('Audio flow: chunks=%d size=%d dB=%.1f', audioChunkCount, chunk.length, logDb);
+  }
   if (levelMonitor && activeCallbacks?.onAudioLevel) {
     const dB = computeDbFromPcm16(chunk);
     const smoothed = levelMonitor.push(dB);
@@ -120,6 +127,7 @@ export function resumeCapture(): void {
 }
 
 export function connectSoniox(callbacks: SonioxLifecycleCallbacks, contextText?: string): void {
+  audioChunkCount = 0;
   activeCallbacks = callbacks;
   storedContextText = contextText ?? null;
   levelMonitor = createAudioLevelMonitor();
