@@ -203,18 +203,23 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
 
   // Audio capture: listen for start/stop commands from main process
   useEffect(() => {
+    const log = window.api.log;
     const unsubStart = window.api.onAudioStartCapture(async (deviceName) => {
+      log('info', `Audio capture requested (device: ${deviceName ?? 'default'})`);
       try {
         await startAudioCapture(
           deviceName,
           (buffer) => window.api.sendAudioChunk(buffer),
           (err) => window.api.sendAudioCaptureError(err.message),
+          log,
         );
       } catch (err) {
+        log('error', `Audio capture threw: ${(err as Error).message}`);
         window.api.sendAudioCaptureError((err as Error).message);
       }
     });
     const unsubStop = window.api.onAudioStopCapture(() => {
+      log('debug', 'Audio capture stop received');
       stopAudioCapture();
     });
     return () => { unsubStart(); unsubStop(); };
