@@ -53,57 +53,48 @@ describe('computeDbFromPcm16', () => {
 });
 
 describe('createAudioLevelMonitor', () => {
-  it('returns smoothed value from push', () => {
-    const monitor = createAudioLevelMonitor(3);
-    const result = monitor.push(-30);
-    expect(typeof result).toBe('number');
-  });
-
-  it('averages over window size', () => {
-    const monitor = createAudioLevelMonitor(3);
-    monitor.push(-30);
-    monitor.push(-20);
-    const avg = monitor.push(-10);
-    // Average of -30, -20, -10 = -20
-    expect(avg).toBe(-20);
-  });
-
-  it('slides the window (drops oldest)', () => {
-    const monitor = createAudioLevelMonitor(2);
-    monitor.push(-40);
-    monitor.push(-20);
-    // Window: [-40, -20], avg = -30
-    const result = monitor.push(-10);
-    // Window: [-20, -10], avg = -15
-    expect(result).toBe(-15);
-  });
-
-  it('returns the single value when window has one entry', () => {
-    const monitor = createAudioLevelMonitor(5);
-    const result = monitor.push(-25);
-    expect(result).toBe(-25);
-  });
-
-  it('handles partial window (fewer values than window size)', () => {
-    const monitor = createAudioLevelMonitor(5);
-    monitor.push(-40);
-    const result = monitor.push(-20);
-    // Average of -40, -20 = -30
-    expect(result).toBe(-30);
-  });
-
-  it('defaults to window size 5', () => {
+  it('snaps immediately to a higher value (fast attack)', () => {
     const monitor = createAudioLevelMonitor();
-    // Push 5 values
+    monitor.push(-40);
+    const result = monitor.push(-10);
+    expect(result).toBe(-10);
+  });
+
+  it('decays gradually from a higher value (slow release)', () => {
+    const monitor = createAudioLevelMonitor(0.35);
+    monitor.push(-10);
+    const result = monitor.push(-40);
+    // Should move toward -40 but not reach it: -10 + (-40 - -10) * 0.35 = -20.5
+    expect(result).toBeCloseTo(-20.5);
+    expect(result).toBeGreaterThan(-40);
+  });
+
+  it('eventually converges to a sustained low level', () => {
+    const monitor = createAudioLevelMonitor(0.35);
+    monitor.push(-10);
+    for (let i = 0; i < 20; i++) {
+      monitor.push(-40);
+    }
+    const result = monitor.push(-40);
+    expect(result).toBeCloseTo(-40, 0);
+  });
+
+  it('tracks rapidly increasing levels without lag', () => {
+    const monitor = createAudioLevelMonitor();
     monitor.push(-50);
     monitor.push(-40);
     monitor.push(-30);
     monitor.push(-20);
-    monitor.push(-10);
-    // Average = (-50+-40+-30+-20+-10)/5 = -30
-    const avg1 = monitor.push(-10);
-    // Window is now [-40,-30,-20,-10,-10], avg = -22
-    expect(avg1).toBe(-22);
+    const result = monitor.push(-10);
+    // Each step is higher, so each should snap immediately
+    expect(result).toBe(-10);
+  });
+
+  it('starts from MIN_DB', () => {
+    const monitor = createAudioLevelMonitor();
+    // First push of a value above MIN_DB should snap to it
+    const result = monitor.push(-30);
+    expect(result).toBe(-30);
   });
 });
 

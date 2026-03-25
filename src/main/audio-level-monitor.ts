@@ -79,21 +79,19 @@ export function createSoundEventDetector(thresholdDb: number): SoundEventDetecto
   };
 }
 
-export function createAudioLevelMonitor(windowSize = 5): AudioLevelMonitor {
-  const effectiveSize = Math.max(1, windowSize);
-  const buffer: number[] = [];
+export function createAudioLevelMonitor(decayRate = 0.35): AudioLevelMonitor {
+  let current = MIN_DB;
 
   return {
     push(dB: number): number {
-      buffer.push(dB);
-      if (buffer.length > effectiveSize) {
-        buffer.shift();
+      if (dB >= current) {
+        // Fast attack: snap to new level
+        current = dB;
+      } else {
+        // Slow decay: exponential falloff
+        current = current + (dB - current) * decayRate;
       }
-      let sum = 0;
-      for (const val of buffer) {
-        sum += val;
-      }
-      return sum / buffer.length;
+      return current;
     },
   };
 }
