@@ -35,6 +35,11 @@ function registerDirtyLeavesLogger(editor: LexicalEditor): () => void {
       editorState.read(() => {
         const node = $getNodeByKey(key);
 
+        // Action is derived from presence in prev vs current state.
+        // Lexical includes deleted node keys in dirtyLeaves, so REMOVED
+        // fires when a node existed before but is absent now. If this
+        // assumption proves wrong for some edit patterns, seeing only
+        // CREATED (without a matching REMOVED) is itself diagnostic.
         let action: string;
         if (prevType === null && node !== null) action = 'CREATED';
         else if (prevType !== null && node === null) action = 'REMOVED';

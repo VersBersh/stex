@@ -19,6 +19,8 @@ Trivial: no
 
 3. **Token commit logging reads flag once into `const verbose`**: The `isVerboseEditorLog()` is read once before the `editor.update()` call and reused for the post-update logging block, avoiding double localStorage access.
 
+4. **Added comment documenting REMOVED action assumption**: The design review flagged that `REMOVED` detection depends on Lexical including deleted node keys in `dirtyLeaves`. Added a comment explaining this assumption and noting that the absence of `REMOVED` is itself diagnostic data.
+
 ## New tasks or follow-up work
 
 None discovered.
