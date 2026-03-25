@@ -2,6 +2,7 @@
   "name": "stex",
   "version": "0.1.0",
   "description": "Live speech-to-text with inline correction",
+  "author": "Draftable",
   "engines": {
     "node": ">=20.19.0 || >=22.12.0"
   },
@@ -10,7 +11,8 @@
     "build": "webpack --config webpack.main.config.js && webpack --config webpack.preload.config.js && webpack --config webpack.renderer.config.js",
     "start": "npm run build && electron .",
     "test": "vitest run",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "dist": "npm run build && electron-builder --win"
   },
   "dependencies": {
     "@lexical/react": "^0.22.0",
