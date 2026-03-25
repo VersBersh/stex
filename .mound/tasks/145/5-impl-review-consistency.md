@@ -1,0 +1,17 @@
+- **Verdict** — `Needs Fixes`
+
+- **Progress**
+  - [x] Step 1: `spec/models.md` updated to describe `TimestampedTextNode` and preserve the offset-based block model.
+  - [x] Step 2: `TimestampedTextNode` class, factory, type guard, and JSON methods were implemented.
+  - [x] Step 3: `TimestampedTextNode` was registered in the editor config.
+  - [x] Step 4: `TokenCommitPlugin` now appends one timestamped node per token.
+  - [~] Step 5: Existing tests were left unchanged as planned, but the current test coverage no longer matches the changed commit behavior closely enough.
+
+- **Issues**
+  1. **Major** — The implementation is not fully captured in version control. [Editor.tsx](/C:/code/draftable/stex/.mound/worktrees/worker-1-f497115a/src/renderer/overlay/editor/Editor.tsx#L17) and [TokenCommitPlugin.tsx](/C:/code/draftable/stex/.mound/worktrees/worker-1-f497115a/src/renderer/overlay/editor/TokenCommitPlugin.tsx#L12) both depend on [TimestampedTextNode.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-f497115a/src/renderer/overlay/editor/TimestampedTextNode.ts#L1), but `git diff HEAD` does not include that file or [TimestampedTextNode.test.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-f497115a/src/renderer/overlay/editor/TimestampedTextNode.test.ts#L1) because they are still untracked. As reviewed in the working tree the code is present, but as a patch/commit this change set is incomplete and would fail anywhere those files are absent. Fix: add the new files to version control and make sure the reviewable diff includes them.
+
+  2. **Minor** — The cursor-tracking integration helper no longer matches production behavior. [cursorTracking.test.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-f497115a/src/renderer/overlay/editor/cursorTracking.test.ts#L32) says it simulates the “exact flow” from `TokenCommitPlugin`, but [cursorTracking.test.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-f497115a/src/renderer/overlay/editor/cursorTracking.test.ts#L55) still appends one plain `TextNode`, while production now appends one `TimestampedTextNode` per token in [TokenCommitPlugin.tsx](/C:/code/draftable/stex/.mound/worktrees/worker-1-f497115a/src/renderer/overlay/editor/TokenCommitPlugin.tsx#L94). That leaves no regression coverage for multi-node final-token batches, which is the core behavior change in this task. Fix: update the helper to take `SonioxToken[]` and append per-token nodes with `TimestampedTextNode` registered, or add a focused integration test around the real multi-token append path.
+
+  3. **Minor** — Mixed empty/non-empty token batches can still create empty Lexical nodes. The batch-level guard in [TokenCommitPlugin.tsx](/C:/code/draftable/stex/.mound/worktrees/worker-1-f497115a/src/renderer/overlay/editor/TokenCommitPlugin.tsx#L51) only checks the joined text, but the loop in [TokenCommitPlugin.tsx](/C:/code/draftable/stex/.mound/worktrees/worker-1-f497115a/src/renderer/overlay/editor/TokenCommitPlugin.tsx#L99) appends every token individually. A batch like `['', 'hello']` would no-op in block-manager terms for the empty token but still create a zero-length `TimestampedTextNode` in the editor. Fix: skip tokens where `token.text.length === 0` inside the append loop.
+
+The core design matches the plan and the node implementation is otherwise consistent with the surrounding Lexical usage, but the untracked-file state and the stale integration coverage are enough that I would not approve this yet.

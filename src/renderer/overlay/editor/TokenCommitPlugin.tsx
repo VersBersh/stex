@@ -5,11 +5,11 @@ import {
   $getSelection,
   $isRangeSelection,
   $setSelection,
-  $createTextNode,
   $createParagraphNode,
   $isParagraphNode,
 } from 'lexical';
 import { $isCursorAtDocumentEnd, $moveCursorToDocumentEnd } from './cursor-track-utils';
+import { $createTimestampedTextNode } from './TimestampedTextNode';
 import type { HistoryState } from '@lexical/history';
 import type { EditorBlockManager, BlockHistory } from './editorBlockManager';
 import type { SonioxToken } from '../../../shared/types';
@@ -91,14 +91,16 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
           const savedFocusOffset = isRange ? prevSelection.focus.offset : 0;
           const savedFocusType = isRange ? prevSelection.focus.type : 'text';
 
-          // 3. Append text
+          // 3. Append text — one TimestampedTextNode per token
           const lastChild = root.getLastChild();
-          if ($isParagraphNode(lastChild)) {
-            lastChild.append($createTextNode(text));
-          } else {
-            const paragraph = $createParagraphNode();
-            paragraph.append($createTextNode(text));
-            root.append(paragraph);
+          const targetParagraph = $isParagraphNode(lastChild)
+            ? lastChild
+            : (() => { const p = $createParagraphNode(); root.append(p); return p; })();
+          for (const token of tokens) {
+            if (token.text.length === 0) continue;
+            targetParagraph.append(
+              $createTimestampedTextNode(token.text, token.start_ms, token.end_ms),
+            );
           }
 
           // 4. Update selection: move cursor to new end if it was tracking,

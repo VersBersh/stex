@@ -56,7 +56,9 @@ interface EditorBlock {
 
 ### Mapping to Lexical
 
-EditorBlocks are **not** 1:1 with Lexical nodes. The Lexical editor uses standard `ParagraphNode` and `TextNode` types. The block list is maintained as a separate data structure alongside the editor state. Block boundaries are tracked by character offset ranges within the document. This avoids the complexity of custom Lexical node types while still preserving ownership metadata.
+EditorBlocks are **not** 1:1 with Lexical nodes. The block list is maintained as a separate data structure alongside the editor state. Block boundaries are tracked by character offset ranges within the document, independent of Lexical node structure.
+
+The Lexical editor uses `ParagraphNode` for structure and `TimestampedTextNode` (a `TextNode` subclass) for committed transcription text. Each `TimestampedTextNode` carries per-token audio timing metadata (`startMs`, `endMs`) and the original transcribed text (`originalText`). These nodes render identically to plain `TextNode` — there is no visual difference. Timestamp metadata may become stale after user edits; edited nodes can be detected by comparing `getTextContent()` to `getOriginalText()`. User-typed text and other non-transcription text uses standard `TextNode`.
 
 Paragraph boundaries in Lexical (multiple `ParagraphNode` children of the root) are represented as newline characters within block text, matching the separator returned by Lexical's `$getRoot().getTextContent()` (currently `\n\n`). When a user splits or joins paragraphs, these characters are inserted or removed via the standard `applyEdit` mechanism — no special handling is needed. The block manager's offset model (character-level) naturally accounts for them as regular characters.
 

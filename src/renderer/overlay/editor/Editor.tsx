@@ -14,9 +14,11 @@ import { createEditorBlockManager, createBlockHistory } from './editorBlockManag
 import { InlineEditPlugin } from './InlineEditPlugin';
 import { UserTypingPlugin } from './UserTypingPlugin';
 import { UndoRedoBlockSyncPlugin } from './UndoRedoBlockSyncPlugin';
+import { TimestampedTextNode } from './TimestampedTextNode';
 
 const initialConfig = {
   namespace: 'StexEditor',
+  nodes: [TimestampedTextNode],
   onError: (error: Error) => console.error(error),
 };
 
