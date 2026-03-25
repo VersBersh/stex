@@ -9,7 +9,8 @@ import {
   $isParagraphNode,
 } from 'lexical';
 import { $isCursorAtDocumentEnd, $moveCursorToDocumentEnd } from './cursor-track-utils';
-import { $createTimestampedTextNode } from './TimestampedTextNode';
+import { $createTimestampedTextNode, $isTimestampedTextNode } from './TimestampedTextNode';
+import { isVerboseEditorLog, verboseLog } from './verboseEditorLog';
 import type { HistoryState } from '@lexical/history';
 import type { EditorBlockManager, BlockHistory } from './editorBlockManager';
 import type { SonioxToken } from '../../../shared/types';
@@ -65,6 +66,17 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
         }
       }
 
+      // Capture child count before mutation for token-commit logging
+      const verbose = isVerboseEditorLog();
+      let childCountBefore = 0;
+      if (verbose) {
+        editor.getEditorState().read(() => {
+          const root = $getRoot();
+          const last = root.getLastChild();
+          if ($isParagraphNode(last)) childCountBefore = last.getChildrenSize();
+        });
+      }
+
       // Append to editor, bypassing undo history.
       // 'historic' tag causes HistoryPlugin to return DISCARD_HISTORY_CANDIDATE,
       // so this update is not recorded in the undo stack.
@@ -116,6 +128,32 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
         },
         { discrete: true, tag: 'historic' },
       );
+
+      // Log committed nodes
+      if (verbose) {
+        editor.getEditorState().read(() => {
+          const root = $getRoot();
+          const last = root.getLastChild();
+          if ($isParagraphNode(last)) {
+            const children = last.getChildren();
+            const newChildren = children.slice(childCountBefore);
+            verboseLog('tokenCommit', `committed ${newChildren.length} node(s):`);
+            for (const child of newChildren) {
+              const meta: Record<string, unknown> = {
+                key: child.getKey(),
+                nodeType: child.getType(),
+                text: child.getTextContent(),
+              };
+              if ($isTimestampedTextNode(child)) {
+                meta.startMs = child.getStartMs();
+                meta.endMs = child.getEndMs();
+                meta.originalText = child.getOriginalText();
+              }
+              verboseLog('tokenCommit', JSON.stringify(meta));
+            }
+          }
+        });
+      }
 
       // Scroll the editor container to follow transcription when the cursor
       // is at the document end and the viewport was near the bottom before the update.

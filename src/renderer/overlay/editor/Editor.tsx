@@ -14,6 +14,7 @@ import { createEditorBlockManager, createBlockHistory } from './editorBlockManag
 import { InlineEditPlugin } from './InlineEditPlugin';
 import { UserTypingPlugin } from './UserTypingPlugin';
 import { UndoRedoBlockSyncPlugin } from './UndoRedoBlockSyncPlugin';
+import { DirtyLeavesLogPlugin } from './DirtyLeavesLogPlugin';
 import { TimestampedTextNode } from './TimestampedTextNode';
 
 const initialConfig = {
@@ -56,6 +57,7 @@ export function Editor() {
         <InlineEditPlugin blockManager={blockManager} />
         <UserTypingPlugin blockManager={blockManager} />
         <GhostTextPlugin />
+        <DirtyLeavesLogPlugin />
       </LexicalComposer>
     </div>
   );

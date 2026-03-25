@@ -1,9 +1,9 @@
 # Struggles — Task 146
 
-- **Category**: `missing-context`
-  **What happened**: Task 145 (`TimestampedTextNode`) is listed as a dependency and is currently `implementing`, but has no plan or implementation artifacts beyond its description. This made it harder to confirm the exact type string (`'timestamped-text'`), the field names (`__startMs`, `__endMs`, `__originalText`), and whether any getter methods would be available. The plan had to use `as any` casts and string-based type checks as a workaround.
-  **What would have helped**: If the task dependency graph ensured that a dependent task's plan artifacts (at minimum) were available before the downstream task was created, the plan could reference concrete API surfaces rather than making assumptions.
+- **Category**: `tooling`
+  **What happened**: Running `codex exec` for code reviews as background Bash tasks corrupted the git worktree. The codex process switched the main repo to the `main` branch, which caused all uncommitted changes in the working directory to be lost. The worktree's `.git` link file was also removed.
+  **What would have helped**: Either (a) the codex review should run in a read-only mode that cannot modify git state, (b) the review should be run in a separate isolated worktree, or (c) changes should be committed before running external tools that might modify git state.
 
 - **Category**: `orientation`
-  **What happened**: The `node_modules` directory lives in the parent repo, not in the worktree. Finding the Lexical type definitions required searching the parent's `node_modules` path, which was not immediately obvious.
-  **What would have helped**: A note in the worktree setup about where `node_modules` is resolved from, or symlinks in the worktree.
+  **What happened**: The working directory path (`C:\code\draftable\stex\.mound\worktrees\worker-2-7d087987`) appeared to be a git worktree but was actually just a directory inside the main repo. Source files lived in the main repo root, not in this directory, and git commands operated against the main repo. This was not obvious from the task setup.
+  **What would have helped**: Clear documentation that the source files are in the main repo root, not in the worktree-named directory.
