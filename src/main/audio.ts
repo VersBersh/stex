@@ -38,9 +38,9 @@ export function stopCapture(): void {
 }
 
 export function registerAudioIpc(): void {
-  ipcMain.on(IpcChannels.AUDIO_CHUNK, (_event, chunk: Buffer) => {
+  ipcMain.on(IpcChannels.AUDIO_CHUNK, (_event, chunk: Uint8Array) => {
     if (capturing && dataHandler) {
-      dataHandler(chunk);
+      dataHandler(Buffer.from(chunk));
     }
   });
 

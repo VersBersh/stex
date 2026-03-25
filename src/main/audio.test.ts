@@ -110,16 +110,20 @@ describe('registerAudioIpc', () => {
     expect(mockHandlers.has(IpcChannels.AUDIO_CAPTURE_ERROR)).toBe(true);
   });
 
-  it('AUDIO_CHUNK handler calls onData callback with buffer', () => {
+  it('AUDIO_CHUNK handler converts Uint8Array to Buffer and calls onData', () => {
     registerAudioIpc();
     const onData = vi.fn();
     startCapture(onData, vi.fn());
 
-    const chunk = Buffer.alloc(3200);
+    // IPC delivers Uint8Array (Electron structured clone), not Buffer
+    const raw = new Uint8Array(3200);
     const handler = mockHandlers.get(IpcChannels.AUDIO_CHUNK)!;
-    handler({}, chunk);
+    handler({}, raw);
 
-    expect(onData).toHaveBeenCalledWith(chunk);
+    expect(onData).toHaveBeenCalledTimes(1);
+    const received = onData.mock.calls[0][0];
+    expect(Buffer.isBuffer(received)).toBe(true);
+    expect(received.length).toBe(3200);
     stopCapture();
   });
 
