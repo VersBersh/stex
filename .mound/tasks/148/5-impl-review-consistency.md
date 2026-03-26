@@ -1,0 +1,10 @@
+**Verdict** — `Needs Fixes`
+
+**Progress**
+- [~] Step 1: Create `AudioRingBuffer` in [src/main/audio-ring-buffer.ts](C:/code/draftable/stex/.mound/worktrees/worker-2-9f2bd432/src/main/audio-ring-buffer.ts)  
+  The module exists and most planned behavior is implemented, but `sliceFrom(ms)` is incorrect at the buffer head / future boundary.
+- [~] Step 2: Create tests in [src/main/audio-ring-buffer.test.ts](C:/code/draftable/stex/.mound/worktrees/worker-2-9f2bd432/src/main/audio-ring-buffer.test.ts)  
+  The planned test areas are mostly covered, but there is no test for `sliceFrom(currentMs)` or any `ms > currentMs`, which is why the boundary bug slipped through.
+
+**Issues**
+1. **Major** — `sliceFrom(ms)` replays stale audio when `ms` is at or beyond the current session head. In [src/main/audio-ring-buffer.ts:33](C:/code/draftable/stex/.mound/worktrees/worker-2-9f2bd432/src/main/audio-ring-buffer.ts#L33), the function only rejects timestamps older than the oldest buffered chunk. The binary search at [src/main/audio-ring-buffer.ts:44](C:/code/draftable/stex/.mound/worktrees/worker-2-9f2bd432/src/main/audio-ring-buffer.ts#L44) then picks the last chunk for any `ms >= lastChunk.startMs`, including `ms === currentMs` and later. That means `sliceFrom(200)` after buffering `0–100ms` and `100–200ms` returns the `100–200ms` chunk instead of “no audio from 200ms onward”. In the planned pause/resume flow, that can duplicate old audio on replay if the caller asks for the current end timestamp or anything slightly ahead. Fix: add an explicit upper-bound check before the binary search so timestamps at/after the buffered head do not return the last chunk; then add tests covering `sliceFrom(currentMs)` and `sliceFrom(currentMs + 1)` in [src/main/audio-ring-buffer.test.ts:50](C:/code/draftable/stex/.mound/worktrees/worker-2-9f2bd432/src/main/audio-ring-buffer.test.ts#L50).
