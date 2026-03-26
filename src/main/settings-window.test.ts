@@ -24,7 +24,7 @@ vi.mock('electron', () => {
     private _bounds: { x: number; y: number; width: number; height: number };
     private _eventHandlers: Map<string, Array<(...args: unknown[]) => void>>;
     private _loadedFile: string | null;
-    webContents: { send: (...args: unknown[]) => void };
+    webContents: { send: (...args: unknown[]) => void; on: (...args: unknown[]) => void; toggleDevTools: () => void };
 
     constructor(opts: Record<string, unknown>) {
       this._opts = { ...opts };
@@ -41,7 +41,7 @@ vi.mock('electron', () => {
       };
       this._eventHandlers = new Map();
       this._loadedFile = null;
-      this.webContents = { send: vi.fn() };
+      this.webContents = { send: vi.fn(), on: vi.fn(), toggleDevTools: vi.fn() };
     }
 
     get constructorOptions() { return this._opts; }
