@@ -6,6 +6,13 @@ function pcm(sampleCount: number): Buffer {
   return Buffer.alloc(sampleCount * 2);
 }
 
+/** Helper: create a PCM buffer tagged with a 16-bit value at offset 0 for identification. */
+function taggedPcm(sampleCount: number, tag: number): Buffer {
+  const b = Buffer.alloc(sampleCount * 2);
+  b.writeInt16LE(tag, 0);
+  return b;
+}
+
 describe('AudioRingBuffer', () => {
   let buf: AudioRingBuffer;
 
@@ -230,6 +237,132 @@ describe('AudioRingBuffer', () => {
       const result = buf.sliceFrom(0);
       expect(result).not.toBeNull();
       expect(result!.readInt16LE(0)).toBe(4444);
+    });
+  });
+
+  describe('integration: recording-then-pause retrieval', () => {
+    it('retrieves all recorded audio after pause', () => {
+      // Simulate recording: push 5 chunks (500ms total), each tagged
+      const tags = [1001, 1002, 1003, 1004, 1005];
+      for (const tag of tags) {
+        buf.push(taggedPcm(1600, tag)); // 100ms each
+      }
+      expect(buf.currentMs).toBe(500);
+
+      // Simulate pause: retrieve all buffered audio via sliceFrom(0)
+      const result = buf.sliceFrom(0);
+      expect(result).not.toBeNull();
+      expect(result!.length).toBe(5 * 3200);
+
+      // Verify each chunk's tag appears in order
+      for (let i = 0; i < tags.length; i++) {
+        expect(result!.readInt16LE(i * 3200)).toBe(tags[i]);
+      }
+    });
+
+    it('retrieves audio from the middle of buffered data', () => {
+      // Record 5 chunks: 0ms, 100ms, 200ms, 300ms, 400ms
+      buf.push(taggedPcm(1600, 10));
+      buf.push(taggedPcm(1600, 20));
+      buf.push(taggedPcm(1600, 30));
+      buf.push(taggedPcm(1600, 40));
+      buf.push(taggedPcm(1600, 50));
+
+      // Pause and retrieve from 200ms — should get chunks 200ms, 300ms, 400ms
+      const result = buf.sliceFrom(200);
+      expect(result).not.toBeNull();
+      expect(result!.length).toBe(3 * 3200);
+      expect(result!.readInt16LE(0)).toBe(30);
+      expect(result!.readInt16LE(3200)).toBe(40);
+      expect(result!.readInt16LE(6400)).toBe(50);
+    });
+
+    it('retrieves audio from a mid-chunk timestamp', () => {
+      buf.push(taggedPcm(1600, 10)); // 0–100ms
+      buf.push(taggedPcm(1600, 20)); // 100–200ms
+      buf.push(taggedPcm(1600, 30)); // 200–300ms
+
+      // Slice at 150ms — falls inside the 100–200ms chunk, returns from that chunk onward
+      const result = buf.sliceFrom(150);
+      expect(result).not.toBeNull();
+      expect(result!.length).toBe(2 * 3200);
+      expect(result!.readInt16LE(0)).toBe(20);
+      expect(result!.readInt16LE(3200)).toBe(30);
+    });
+
+    it('retrieves correct data after wrap-around eviction', () => {
+      // 1-second capacity = 32000 bytes = 10 chunks of 3200 bytes
+      // Push 15 chunks (1500ms) so first 5 are evicted
+      const tags: number[] = [];
+      for (let i = 0; i < 15; i++) {
+        tags.push(100 + i);
+        buf.push(taggedPcm(1600, 100 + i));
+      }
+
+      // Evicted: chunks 0–4 (tags 100–104), surviving: chunks 5–14 (tags 105–114)
+      const oldest = buf.oldestMs!;
+      expect(oldest).toBeGreaterThan(0);
+      expect(buf.sliceFrom(0)).toBeNull(); // evicted range
+
+      // Retrieve surviving audio from oldest timestamp
+      const result = buf.sliceFrom(oldest);
+      expect(result).not.toBeNull();
+
+      // Verify the first surviving chunk has the expected tag
+      const expectedFirstTag = 100 + Math.round(oldest / 100);
+      expect(result!.readInt16LE(0)).toBe(expectedFirstTag);
+
+      // Verify all surviving chunks are present and in order
+      const survivingCount = result!.length / 3200;
+      for (let i = 0; i < survivingCount; i++) {
+        expect(result!.readInt16LE(i * 3200)).toBe(expectedFirstTag + i);
+      }
+    });
+
+    it('retrieves from mid-point after wrap-around', () => {
+      // Push 20 chunks (2000ms) into 1-second buffer
+      for (let i = 0; i < 20; i++) {
+        buf.push(taggedPcm(1600, 200 + i));
+      }
+
+      const oldest = buf.oldestMs!;
+      // Slice from a point in the middle of the surviving range
+      const midpoint = oldest + 300; // 3 chunks past oldest
+      const result = buf.sliceFrom(midpoint);
+      expect(result).not.toBeNull();
+
+      // Should be smaller than slicing from oldest
+      const fullResult = buf.sliceFrom(oldest)!;
+      expect(result!.length).toBeLessThan(fullResult.length);
+
+      // Verify the tag at the start corresponds to the chunk containing midpoint
+      const expectedTag = 200 + Math.round(midpoint / 100);
+      expect(result!.readInt16LE(0)).toBe(expectedTag);
+    });
+
+    it('supports clear-then-record cycle (multiple sessions)', () => {
+      // Session 1: record 3 chunks
+      buf.push(taggedPcm(1600, 501));
+      buf.push(taggedPcm(1600, 502));
+      buf.push(taggedPcm(1600, 503));
+
+      const session1 = buf.sliceFrom(0);
+      expect(session1).not.toBeNull();
+      expect(session1!.readInt16LE(0)).toBe(501);
+
+      // Pause & clear (simulate session boundary)
+      buf.clear();
+      expect(buf.sliceFrom(0)).toBeNull();
+
+      // Session 2: record new chunks
+      buf.push(taggedPcm(1600, 601));
+      buf.push(taggedPcm(1600, 602));
+
+      const session2 = buf.sliceFrom(0);
+      expect(session2).not.toBeNull();
+      expect(session2!.length).toBe(2 * 3200);
+      expect(session2!.readInt16LE(0)).toBe(601);
+      expect(session2!.readInt16LE(3200)).toBe(602);
     });
   });
 
