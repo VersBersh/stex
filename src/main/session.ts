@@ -6,7 +6,7 @@ import { flashTrayIcon } from './tray';
 import { IpcChannels } from '../shared/ipc';
 import type { SessionState, SonioxToken, ErrorInfo } from '../shared/types';
 import { registerSessionIpc } from './session-ipc';
-import { connectSoniox, finalizeSoniox, isConnected, hasPendingNonFinalTokens, resumeCapture, cancelReconnect, resetLifecycle } from './soniox-lifecycle';
+import { connectSoniox, finalizeSoniox, isConnected, hasPendingNonFinalTokens, resumeCapture, cancelReconnect, resetLifecycle, capturePendingStartMs } from './soniox-lifecycle';
 import { MIN_DB } from './audio-level-monitor';
 import { sendToRenderer, sendStatus, sendError, clearError } from './renderer-send';
 import { copyEditorTextToClipboard } from './session-clipboard';
@@ -118,6 +118,11 @@ async function pauseSession(): Promise<void> {
 
   stopCapture();
   sendToRenderer(IpcChannels.AUDIO_LEVEL, MIN_DB);
+
+  // Snapshot the start time of any unfinalized tokens before finalization
+  // attempts to drain them. This is a frozen snapshot — even if finalization
+  // succeeds, the committed tokens used old context and may need replay.
+  capturePendingStartMs();
 
   if (isConnected() && hasPendingNonFinalTokens()) {
     finalizeSoniox();

@@ -88,7 +88,7 @@ vi.mock('./audio-ring-buffer', () => ({
 
 vi.mock('./logger');
 
-import { connectSoniox, isConnected, finalizeSoniox, sendAudio, resumeCapture, cancelReconnect, resetLifecycle, applyTimestampOffset } from './soniox-lifecycle';
+import { connectSoniox, isConnected, finalizeSoniox, sendAudio, resumeCapture, cancelReconnect, resetLifecycle, applyTimestampOffset, capturePendingStartMs, getPendingStartMs } from './soniox-lifecycle';
 
 function createMockCallbacks() {
   return {
@@ -560,6 +560,97 @@ describe('soniox-lifecycle', () => {
     it('handles empty array', () => {
       const result = applyTimestampOffset([], 5000);
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('pendingStartMs', () => {
+    beforeEach(() => {
+      connectSoniox(createMockCallbacks());
+      triggerOnConnected();
+    });
+
+    it('captures first non-final token start_ms', () => {
+      const tokens = [{ text: 'hel', start_ms: 500, end_ms: 600, confidence: 0.9, is_final: false }];
+      mockSonioxInstance._events.onNonFinalTokens?.(tokens);
+
+      capturePendingStartMs();
+
+      expect(getPendingStartMs()).toBe(500);
+    });
+
+    it('returns null when onNonFinalTokens receives empty array', () => {
+      mockSonioxInstance._events.onNonFinalTokens?.([]);
+
+      capturePendingStartMs();
+
+      expect(getPendingStartMs()).toBeNull();
+    });
+
+    it('returns null when no tokens ever received', () => {
+      capturePendingStartMs();
+
+      expect(getPendingStartMs()).toBeNull();
+    });
+
+    it('final tokens clear lastNonFinalStartMs but NOT pendingStartMs', () => {
+      const tokens = [{ text: 'hel', start_ms: 500, end_ms: 600, confidence: 0.9, is_final: false }];
+      mockSonioxInstance._events.onNonFinalTokens?.(tokens);
+
+      capturePendingStartMs();
+      expect(getPendingStartMs()).toBe(500);
+
+      // Final tokens arrive, clearing non-final state
+      mockSonioxInstance.hasPendingNonFinalTokens = false;
+      mockSonioxInstance._events.onFinalTokens?.([{ text: 'hello', start_ms: 500, end_ms: 700, confidence: 0.95, is_final: true }]);
+
+      // pendingStartMs is a frozen snapshot — NOT cleared
+      expect(getPendingStartMs()).toBe(500);
+    });
+
+    it('pendingStartMs persists across finalization cycle', () => {
+      const tokens = [{ text: 'hel', start_ms: 500, end_ms: 600, confidence: 0.9, is_final: false }];
+      mockSonioxInstance._events.onNonFinalTokens?.(tokens);
+
+      capturePendingStartMs();
+      expect(getPendingStartMs()).toBe(500);
+
+      // Simulate finalization: finals arrive, non-finals drain
+      mockSonioxInstance.hasPendingNonFinalTokens = false;
+      mockSonioxInstance._events.onFinalTokens?.([{ text: 'hello', start_ms: 500, end_ms: 700, confidence: 0.95, is_final: true }]);
+      mockSonioxInstance._events.onNonFinalTokens?.([]);
+
+      expect(getPendingStartMs()).toBe(500);
+    });
+
+    it('captures most recent non-final start', () => {
+      mockSonioxInstance._events.onNonFinalTokens?.([{ text: 'h', start_ms: 100, end_ms: 200, confidence: 0.5, is_final: false }]);
+      mockSonioxInstance._events.onNonFinalTokens?.([{ text: 'he', start_ms: 200, end_ms: 300, confidence: 0.6, is_final: false }]);
+
+      capturePendingStartMs();
+
+      expect(getPendingStartMs()).toBe(200);
+    });
+
+    it('resetLifecycle clears pendingStartMs', () => {
+      mockSonioxInstance._events.onNonFinalTokens?.([{ text: 'hel', start_ms: 500, end_ms: 600, confidence: 0.9, is_final: false }]);
+      capturePendingStartMs();
+      expect(getPendingStartMs()).toBe(500);
+
+      resetLifecycle();
+
+      expect(getPendingStartMs()).toBeNull();
+    });
+
+    it('uses first token start_ms from multi-token batch', () => {
+      const tokens = [
+        { text: 'hel', start_ms: 300, end_ms: 400, confidence: 0.8, is_final: false },
+        { text: 'lo', start_ms: 400, end_ms: 500, confidence: 0.7, is_final: false },
+      ];
+      mockSonioxInstance._events.onNonFinalTokens?.(tokens);
+
+      capturePendingStartMs();
+
+      expect(getPendingStartMs()).toBe(300);
     });
   });
 

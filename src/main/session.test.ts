@@ -136,6 +136,7 @@ vi.mock('./tray', () => ({
 vi.mock('./logger');
 
 import { initSessionManager, requestToggle, requestQuickDismiss } from './session';
+import { getPendingStartMs } from './soniox-lifecycle';
 import { IpcChannels } from '../shared/ipc';
 
 // --- Helpers ---
@@ -425,6 +426,58 @@ describe('Session Manager', () => {
       });
 
       expect(mockSonioxInstance.disconnect).not.toHaveBeenCalled();
+    });
+
+    it('captures pendingStartMs on pause when non-final tokens exist', async () => {
+      // Trigger non-final tokens (raw connection-relative timestamps)
+      triggerOnNonFinalTokens([{ text: 'hel', start_ms: 500, end_ms: 600, confidence: 0.9, is_final: false }]);
+
+      triggerPauseIpc();
+      triggerOnFinished();
+
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_PAUSED,
+        );
+      });
+
+      // connectionBaseMs is 0 for initial connection, so pendingStartMs = 0 + 500
+      expect(getPendingStartMs()).toBe(500);
+    });
+
+    it('pendingStartMs is null on pause when no non-final tokens', async () => {
+      mockSonioxInstance.hasPendingNonFinalTokens = false;
+
+      triggerPauseIpc();
+
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_PAUSED,
+        );
+      });
+
+      expect(getPendingStartMs()).toBeNull();
+    });
+
+    it('pendingStartMs survives finalization during pause', async () => {
+      // Trigger non-final tokens
+      triggerOnNonFinalTokens([{ text: 'hel', start_ms: 500, end_ms: 600, confidence: 0.9, is_final: false }]);
+
+      triggerPauseIpc();
+
+      // Simulate finalization completing: final tokens arrive, clearing non-final state
+      mockSonioxInstance.hasPendingNonFinalTokens = false;
+      triggerOnFinalTokens([{ text: 'hello', start_ms: 500, end_ms: 700, confidence: 0.95, is_final: true }]);
+      triggerOnFinished();
+
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_PAUSED,
+        );
+      });
+
+      // Frozen snapshot — NOT cleared by finalization
+      expect(getPendingStartMs()).toBe(500);
     });
   });
 

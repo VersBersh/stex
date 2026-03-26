@@ -28,6 +28,8 @@ let soundEventDetector: SoundEventDetector | null = null;
 let awaitingFinalization = false;
 let ringBuffer: AudioRingBuffer | null = null;
 let connectionBaseMs = 0;
+let lastNonFinalStartMs: number | null = null;
+let pendingStartMs: number | null = null;
 
 export function isConnected(): boolean {
   return soniox?.connected ?? false;
@@ -73,6 +75,19 @@ export function applyTimestampOffset(tokens: SonioxToken[], offsetMs: number): S
   }));
 }
 
+export function capturePendingStartMs(): void {
+  pendingStartMs = lastNonFinalStartMs;
+  if (pendingStartMs != null) {
+    debug('Captured pendingStartMs=%d', pendingStartMs);
+  } else {
+    debug('No pending non-final tokens at capture time');
+  }
+}
+
+export function getPendingStartMs(): number | null {
+  return pendingStartMs;
+}
+
 export function resetLifecycle(): void {
   debug('Lifecycle reset');
   cancelReconnect();
@@ -81,6 +96,8 @@ export function resetLifecycle(): void {
   soniox = null;
   storedContextText = null;
   connectionBaseMs = 0;
+  lastNonFinalStartMs = null;
+  pendingStartMs = null;
   ringBuffer?.clear();
   ringBuffer = null;
   levelMonitor = null;
@@ -109,6 +126,7 @@ function handleDisconnect(code: number, reason: string): void {
   stopCapture();
   activeCallbacks?.onAudioLevel?.(MIN_DB);
   flushSoundEvent();
+  lastNonFinalStartMs = null;
 
   // Close code 1000 during finalization is expected — Soniox signals
   // completion by closing the WebSocket rather than sending finished:true.
@@ -214,9 +232,13 @@ export function connectSoniox(callbacks: SonioxLifecycleCallbacks, contextText?:
       callbacks.onStatusChange('recording');
     },
     onFinalTokens: (tokens: SonioxToken[]) => {
+      if (!soniox?.hasPendingNonFinalTokens) {
+        lastNonFinalStartMs = null;
+      }
       callbacks.onFinalTokens(applyTimestampOffset(tokens, baseMs));
     },
     onNonFinalTokens: (tokens: SonioxToken[]) => {
+      lastNonFinalStartMs = tokens.length > 0 ? baseMs + tokens[0].start_ms : null;
       callbacks.onNonFinalTokens(applyTimestampOffset(tokens, baseMs));
     },
     onFinished: () => {
@@ -257,9 +279,13 @@ function attemptReconnect(): void {
       callbacks.onError(null);
     },
     onFinalTokens: (tokens: SonioxToken[]) => {
+      if (!soniox?.hasPendingNonFinalTokens) {
+        lastNonFinalStartMs = null;
+      }
       callbacks.onFinalTokens(applyTimestampOffset(tokens, baseMs));
     },
     onNonFinalTokens: (tokens: SonioxToken[]) => {
+      lastNonFinalStartMs = tokens.length > 0 ? baseMs + tokens[0].start_ms : null;
       callbacks.onNonFinalTokens(applyTimestampOffset(tokens, baseMs));
     },
     onFinished: () => {
