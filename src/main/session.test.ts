@@ -95,8 +95,12 @@ vi.mock('electron', () => ({
     once: (channel: string, handler: (...args: unknown[]) => void) => {
       mockIpcMainHandlers.set(channel, handler);
     },
-    removeListener: (channel: string, _handler: (...args: unknown[]) => void) => {
-      mockIpcMainHandlers.delete(channel);
+    removeListener: (channel: string, handler: (...args: unknown[]) => void) => {
+      // Only remove if the handler matches — prevents stale timeouts from
+      // removing a different handler registered by a subsequent test.
+      if (mockIpcMainHandlers.get(channel) === handler) {
+        mockIpcMainHandlers.delete(channel);
+      }
     },
   },
   clipboard: mockClipboard,
@@ -136,7 +140,7 @@ vi.mock('./tray', () => ({
 vi.mock('./logger');
 
 import { initSessionManager, requestToggle, requestQuickDismiss } from './session';
-import { getPendingStartMs } from './soniox-lifecycle';
+import { getPendingStartMs, isInReplayPhase } from './soniox-lifecycle';
 import { IpcChannels } from '../shared/ipc';
 
 // --- Helpers ---
@@ -1361,6 +1365,168 @@ describe('Session Manager', () => {
         (call: unknown[]) => call[0] === IpcChannels.SESSION_RESUME_ANALYSIS,
       );
       expect(analysisCalls).toHaveLength(1);
+    });
+
+    describe('replay flow', () => {
+      // Each chunk is 3200 bytes = 100ms of audio at 16kHz/16-bit
+      const CHUNK_SIZE = 3200;
+      const NUM_CHUNKS = 50; // 5000ms of audio
+
+      // Earlier tests in this file leave dangling async operations with real-time
+      // timeouts that can corrupt module state. Drain them before each test.
+      beforeEach(async () => {
+        await new Promise(r => setTimeout(r, 1200));
+        initSessionManager();
+      });
+
+
+      async function startAndPauseWithAudio(opts?: { triggerNonFinals?: boolean }) {
+        mockOverlayWindow.isVisible.mockReturnValue(false);
+        requestToggle();
+        triggerOnConnected();
+
+        // Push deterministic audio chunks to populate the ring buffer
+        const onAudioData = mockAudio.startCapture.mock.calls[0][0] as (chunk: Buffer) => void;
+        for (let i = 0; i < NUM_CHUNKS; i++) {
+          onAudioData(Buffer.alloc(CHUNK_SIZE, i % 256));
+        }
+
+        // Optionally trigger non-final tokens to set pendingStartMs
+        if (opts?.triggerNonFinals) {
+          triggerOnNonFinalTokens([
+            { text: 'hel', start_ms: 500, end_ms: 600, confidence: 0.9, is_final: false },
+          ]);
+        }
+
+        // Pause
+        triggerPauseIpc();
+        triggerOnFinished();
+        await vi.waitFor(() => {
+          expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+            IpcChannels.SESSION_PAUSED,
+          );
+        });
+        mockOverlayWindow.webContents.send.mockClear();
+        mockAudio.startCapture.mockClear();
+        mockSonioxInstance.disconnect.mockClear();
+        mockSonioxInstance.connect.mockClear();
+        mockSonioxInstance.sendAudio.mockClear();
+      }
+
+      // Helper: trigger resume and respond with analysis in one synchronous sequence.
+      // The handler registration in getResumeAnalysis() is synchronous, so we can
+      // call respondToResumeAnalysis immediately after triggerResumeIpc without waitFor.
+      function resumeWithAnalysis(analysis: Parameters<typeof respondToResumeAnalysis>[0]) {
+        triggerResumeIpc();
+        respondToResumeAnalysis(analysis);
+      }
+
+      it('sends ghost conversion IPC and replay audio in correct order after connection B opens', async () => {
+        await startAndPauseWithAudio();
+
+        resumeWithAnalysis({
+          editorWasModified: true,
+          replayAnalysis: { eligible: true, replayStartMs: 1000, replayGhostStartMs: 2000, blockedReason: 'none' },
+          editorText: 'corrected text',
+        });
+
+        await vi.waitFor(() => {
+          expect(mockSonioxInstance.connect).toHaveBeenCalled();
+        });
+
+        // Trigger connection B open
+        triggerOnConnected();
+
+        // Ghost conversion IPC should have been sent
+        await vi.waitFor(() => {
+          expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+            IpcChannels.SESSION_REPLAY_GHOST_CONVERT,
+            2000,
+          );
+        });
+
+        // Replay audio should have been sent via sendAudio
+        expect(mockSonioxInstance.sendAudio).toHaveBeenCalled();
+        const firstSendArg = mockSonioxInstance.sendAudio.mock.calls[0][0];
+        expect(Buffer.isBuffer(firstSendArg)).toBe(true);
+        expect(firstSendArg.length).toBeGreaterThan(0);
+
+        // Ghost conversion IPC fires before replay audio send
+        const ghostConvertCall = mockOverlayWindow.webContents.send.mock.invocationCallOrder[
+          mockOverlayWindow.webContents.send.mock.calls.findIndex(
+            (call: unknown[]) => call[0] === IpcChannels.SESSION_REPLAY_GHOST_CONVERT,
+          )
+        ];
+        const replaySendCall = mockSonioxInstance.sendAudio.mock.invocationCallOrder[0];
+        expect(ghostConvertCall).toBeDefined();
+        expect(replaySendCall).toBeDefined();
+        expect(ghostConvertCall).toBeLessThan(replaySendCall);
+      });
+
+      it('effectiveReplayStartMs uses pendingStartMs when it is earlier than replayStartMs', async () => {
+        await startAndPauseWithAudio({ triggerNonFinals: true });
+
+        // pendingStartMs should be 500 (from non-final tokens at start_ms: 500)
+        expect(getPendingStartMs()).toBe(500);
+
+        resumeWithAnalysis({
+          editorWasModified: true,
+          replayAnalysis: { eligible: true, replayStartMs: 3000, replayGhostStartMs: 3000, blockedReason: 'none' },
+          editorText: 'corrected text',
+        });
+
+        await vi.waitFor(() => {
+          expect(mockSonioxInstance.connect).toHaveBeenCalled();
+        });
+
+        triggerOnConnected();
+
+        await vi.waitFor(() => {
+          expect(mockSonioxInstance.sendAudio).toHaveBeenCalled();
+        });
+
+        // effectiveReplayStartMs = Math.min(3000, 500) = 500
+        // The ring buffer sliceFromWithMeta(500) returns actualStartMs = 500
+        // (chunk at index 5, since each 3200-byte chunk = 100ms)
+        // So connectionBaseMs = 500.
+        // Verify by sending tokens and checking the offset.
+        mockOverlayWindow.webContents.send.mockClear();
+        triggerOnFinalTokens([
+          { text: 'test', start_ms: 100, end_ms: 200, confidence: 0.9, is_final: true },
+        ]);
+
+        // Tokens should be offset by connectionBaseMs (500)
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.TOKENS_FINAL,
+          [expect.objectContaining({ start_ms: 600, end_ms: 700 })],
+        );
+      });
+
+      it('replay-ineligible resume with editorWasModified does fresh reconnect without replay', async () => {
+        await startAndPauseWithAudio();
+
+        resumeWithAnalysis({
+          editorWasModified: true,
+          replayAnalysis: { eligible: false, replayStartMs: null, replayGhostStartMs: null, blockedReason: 'dirty-tail' },
+          editorText: 'edited text',
+        });
+
+        await vi.waitFor(() => {
+          expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+            expect.objectContaining({ sonioxApiKey: 'test-key' }),
+            'edited text',
+          );
+        });
+
+        // Should NOT be in replay phase
+        expect(isInReplayPhase()).toBe(false);
+
+        // Ghost conversion IPC should NOT have been sent
+        const ghostCalls = mockOverlayWindow.webContents.send.mock.calls.filter(
+          (call: unknown[]) => call[0] === IpcChannels.SESSION_REPLAY_GHOST_CONVERT,
+        );
+        expect(ghostCalls).toHaveLength(0);
+      });
     });
   });
 });

@@ -946,4 +946,214 @@ describe('soniox-lifecycle', () => {
       expect(isInReplayPhase()).toBe(false);
     });
   });
+
+  describe('replay — state transitions and audio buffering', () => {
+    // 2 seconds of audio at 16kHz, 16-bit = 64000 bytes → replayEndRelativeMs = 2000
+    const REPLAY_AUDIO_BYTES = 64000;
+    let disconnectCalls: number;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      disconnectCalls = 0;
+      mockSonioxInstance.disconnect.mockImplementation(() => { disconnectCalls++; });
+      mockAudio.startCapture.mockImplementation(vi.fn());
+      mockRingBufferInstance.sliceFromWithMeta.mockReturnValue({
+        data: Buffer.alloc(REPLAY_AUDIO_BYTES, 0),
+        actualStartMs: 0,
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function setupReplayDrain(callbacks: ReturnType<typeof createMockCallbacks>) {
+      connectSoniox(callbacks);
+      triggerOnConnected();
+      beginReplayPhase();
+      reconnectWithContext('fresh context', {
+        onReady: () => sendReplayAudio(0),
+      });
+      triggerOnConnected();
+      // Now in 'draining' phase with zero-token timer (3s) and safety timer (10s) running
+    }
+
+    it('beginReplayPhase sets isInReplayPhase to true', () => {
+      connectSoniox(createMockCallbacks());
+      triggerOnConnected();
+
+      expect(isInReplayPhase()).toBe(false);
+      beginReplayPhase();
+      expect(isInReplayPhase()).toBe(true);
+    });
+
+    it('audio chunks are buffered during replay instead of sent to Soniox', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+
+      beginReplayPhase();
+
+      // Get audio callback and push chunks
+      const onAudioData = mockAudio.startCapture.mock.calls[0][0] as (chunk: Buffer) => void;
+      const chunk1 = Buffer.alloc(3200, 1);
+      const chunk2 = Buffer.alloc(3200, 2);
+
+      mockSonioxInstance.sendAudio.mockClear();
+      mockRingBufferInstance.push.mockClear();
+
+      onAudioData(chunk1);
+      onAudioData(chunk2);
+
+      // Ring buffer still receives data
+      expect(mockRingBufferInstance.push).toHaveBeenCalledTimes(2);
+      expect(mockRingBufferInstance.push).toHaveBeenNthCalledWith(1, chunk1);
+      expect(mockRingBufferInstance.push).toHaveBeenNthCalledWith(2, chunk2);
+
+      // But Soniox does NOT receive the live audio during replay
+      expect(mockSonioxInstance.sendAudio).not.toHaveBeenCalled();
+    });
+
+    it('buffered live audio is flushed to Soniox when replay ends while connected', () => {
+      const callbacks = createMockCallbacks();
+      setupReplayDrain(callbacks);
+
+      // Get audio callback from the reconnected client's startCapture
+      const onAudioData = mockAudio.startCapture.mock.calls.at(-1)![0] as (chunk: Buffer) => void;
+
+      // Push live audio chunks during draining phase
+      const liveChunk1 = Buffer.alloc(3200, 0xaa);
+      const liveChunk2 = Buffer.alloc(3200, 0xbb);
+      onAudioData(liveChunk1);
+      onAudioData(liveChunk2);
+
+      // Clear sendAudio to track only the flush
+      mockSonioxInstance.sendAudio.mockClear();
+
+      // Trigger drain completion — final tokens reach threshold
+      mockSonioxInstance._events.onFinalTokens?.([
+        { text: 'hello', start_ms: 0, end_ms: 2000, confidence: 0.9, is_final: true },
+      ]);
+
+      expect(isInReplayPhase()).toBe(false);
+
+      // Buffered live audio should have been flushed
+      expect(mockSonioxInstance.sendAudio).toHaveBeenCalledTimes(2);
+      expect(mockSonioxInstance.sendAudio).toHaveBeenNthCalledWith(1, liveChunk1);
+      expect(mockSonioxInstance.sendAudio).toHaveBeenNthCalledWith(2, liveChunk2);
+    });
+
+    it('buffered live audio is discarded when replay ends while disconnected', () => {
+      const callbacks = createMockCallbacks();
+      setupReplayDrain(callbacks);
+
+      // Push live audio during draining
+      const onAudioData = mockAudio.startCapture.mock.calls.at(-1)![0] as (chunk: Buffer) => void;
+      onAudioData(Buffer.alloc(3200, 0xcc));
+
+      mockSonioxInstance.sendAudio.mockClear();
+
+      // Simulate disconnect before drain completes
+      mockSonioxInstance.connected = false;
+
+      // Force drain via safety timeout
+      vi.advanceTimersByTime(10000);
+
+      expect(isInReplayPhase()).toBe(false);
+      // Buffered audio should NOT have been sent (disconnected)
+      expect(mockSonioxInstance.sendAudio).not.toHaveBeenCalled();
+    });
+
+    it('sendReplayAudio handles null slice gracefully', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+
+      mockRingBufferInstance.sliceFromWithMeta.mockReturnValue(null);
+      mockSonioxInstance.sendAudio.mockClear();
+      beginReplayPhase();
+
+      reconnectWithContext('text', {
+        onReady: () => sendReplayAudio(0),
+      });
+      triggerOnConnected();
+
+      // Should have exited replay immediately
+      expect(isInReplayPhase()).toBe(false);
+      expect(mockRingBufferInstance.sliceFromWithMeta).toHaveBeenCalledWith(0);
+      // No replay audio should have been sent
+      expect(mockSonioxInstance.sendAudio).not.toHaveBeenCalled();
+    });
+
+    it('sendReplayAudio handles empty slice gracefully', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+
+      mockRingBufferInstance.sliceFromWithMeta.mockReturnValue({
+        data: Buffer.alloc(0),
+        actualStartMs: 0,
+      });
+      mockSonioxInstance.sendAudio.mockClear();
+      beginReplayPhase();
+
+      reconnectWithContext('text', {
+        onReady: () => sendReplayAudio(0),
+      });
+      triggerOnConnected();
+
+      expect(isInReplayPhase()).toBe(false);
+      // No replay audio should have been sent
+      expect(mockSonioxInstance.sendAudio).not.toHaveBeenCalled();
+    });
+
+    it('sendReplayAudio updates connectionBaseMs from actualStartMs', () => {
+      const callbacks = createMockCallbacks();
+
+      mockRingBufferInstance.sliceFromWithMeta.mockReturnValue({
+        data: Buffer.alloc(REPLAY_AUDIO_BYTES, 0),
+        actualStartMs: 3000,
+      });
+
+      setupReplayDrain(callbacks);
+
+      // Complete drain
+      mockSonioxInstance._events.onFinalTokens?.([
+        { text: 'done', start_ms: 0, end_ms: 2000, confidence: 0.9, is_final: true },
+      ]);
+      expect(isInReplayPhase()).toBe(false);
+
+      // Now send new tokens on the same connection — they should be offset by 3000
+      callbacks.onFinalTokens.mockClear();
+      mockSonioxInstance._events.onFinalTokens?.([
+        { text: 'new', start_ms: 100, end_ms: 200, confidence: 0.9, is_final: true },
+      ]);
+
+      expect(callbacks.onFinalTokens).toHaveBeenCalledWith([
+        expect.objectContaining({ start_ms: 3100, end_ms: 3200 }),
+      ]);
+    });
+
+    it('disconnect during replay calls endReplayPhase', () => {
+      const callbacks = createMockCallbacks();
+      setupReplayDrain(callbacks);
+
+      expect(isInReplayPhase()).toBe(true);
+
+      triggerOnDisconnected(1006, 'connection lost');
+
+      expect(isInReplayPhase()).toBe(false);
+    });
+
+    it('error during replay calls endReplayPhase', () => {
+      const callbacks = createMockCallbacks();
+      setupReplayDrain(callbacks);
+
+      expect(isInReplayPhase()).toBe(true);
+
+      triggerOnError(new Error('connection failed'));
+
+      expect(isInReplayPhase()).toBe(false);
+    });
+  });
 });

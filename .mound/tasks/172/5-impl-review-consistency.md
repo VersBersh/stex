@@ -1,0 +1,14 @@
+**Verdict** — `Needs Fixes`
+
+**Progress**
+- `[~]` Step 1: Added the new replay lifecycle test block and most planned cases in [soniox-lifecycle.test.ts](C:/code/draftable/stex/.mound/worktrees/worker-1-51af2d0b/src/main/soniox-lifecycle.test.ts), but the null/empty-slice cases are only partially asserted.
+- `[~]` Step 2: Added replay flow coverage in [session.test.ts](C:/code/draftable/stex/.mound/worktrees/worker-1-51af2d0b/src/main/session.test.ts), including ghost IPC ordering, effective replay start, and ineligible replay fallback, but the implementation deviates from the plan by papering over async leakage with a real-time sleep.
+
+**Issues**
+1. **Major** — The new replay-flow tests depend on a wall-clock `1200ms` sleep in [session.test.ts#L1383](C:/code/draftable/stex/.mound/worktrees/worker-1-51af2d0b/src/main/session.test.ts#L1383) to let prior async work “settle”. That is a brittle test hack: it slows the suite, can still be flaky under load, and masks the real cleanup problem instead of fixing it. The underlying timeout is deterministic in [session.ts#L93](C:/code/draftable/stex/.mound/worktrees/worker-1-51af2d0b/src/main/session.ts#L93), and one leaking test was already fixed in [session.test.ts#L1365](C:/code/draftable/stex/.mound/worktrees/worker-1-51af2d0b/src/main/session.test.ts#L1365). Suggested fix: remove the sleep and make every test that triggers resume either resolve the pending analysis explicitly or advance fake timers; if needed, make the `ipcMain.once` mock behave like a true one-shot handler.
+
+2. **Minor** — The planned “no replay audio is sent” assertion is missing from both graceful-failure replay tests at [soniox-lifecycle.test.ts#L1067](C:/code/draftable/stex/.mound/worktrees/worker-1-51af2d0b/src/main/soniox-lifecycle.test.ts#L1067) and [soniox-lifecycle.test.ts#L1086](C:/code/draftable/stex/.mound/worktrees/worker-1-51af2d0b/src/main/soniox-lifecycle.test.ts#L1086). The production branch in [soniox-lifecycle.ts#L139](C:/code/draftable/stex/.mound/worktrees/worker-1-51af2d0b/src/main/soniox-lifecycle.ts#L139) is specifically about exiting replay without sending when the slice is null or empty, but the tests only verify phase exit. Suggested fix: add `expect(mockSonioxInstance.sendAudio).not.toHaveBeenCalled()` in both cases.
+
+3. **Minor** — `endReplayPhase` was added to the import list in [soniox-lifecycle.test.ts#L92](C:/code/draftable/stex/.mound/worktrees/worker-1-51af2d0b/src/main/soniox-lifecycle.test.ts#L92) but is unused. Suggested fix: remove the import unless a direct test for it is being added.
+
+No production-code regression stood out from the code-reading review; the problems are in test determinism and a small coverage gap versus the plan.
