@@ -1,0 +1,1 @@
+No struggles — the task was straightforward. The only minor friction was needing to temporarily install `sharp` since no image processing library was available in the project, but `npm install --no-save` handled that cleanly.
