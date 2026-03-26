@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // --- Hoisted mocks ---
 
-const { mockSonioxInstance, MockSonioxClient, mockAudio, mockSettingsData } = vi.hoisted(() => {
+const { mockSonioxInstance, MockSonioxClient, mockAudio, mockSettingsData, mockRingBufferInstance, MockAudioRingBuffer } = vi.hoisted(() => {
   const mockSonioxInstance = {
     connect: vi.fn(),
     sendAudio: vi.fn(),
@@ -42,7 +42,17 @@ const { mockSonioxInstance, MockSonioxClient, mockAudio, mockSettingsData } = vi
     maxEndpointDelayMs: 1000,
   };
 
-  return { mockSonioxInstance, MockSonioxClient, mockAudio, mockSettingsData };
+  const mockRingBufferInstance = {
+    push: vi.fn(),
+    sliceFrom: vi.fn(),
+    clear: vi.fn(),
+    currentMs: 0,
+    oldestMs: null as number | null,
+  };
+
+  const MockAudioRingBuffer = vi.fn(function () { return mockRingBufferInstance; });
+
+  return { mockSonioxInstance, MockSonioxClient, mockAudio, mockSettingsData, mockRingBufferInstance, MockAudioRingBuffer };
 });
 
 vi.mock('./soniox', () => ({
@@ -70,6 +80,10 @@ vi.mock('./error-classification', () => ({
 
 vi.mock('./reconnect-policy', () => ({
   getReconnectDelay: (attempt: number) => Math.min(1000 * Math.pow(2, attempt), 30000),
+}));
+
+vi.mock('./audio-ring-buffer', () => ({
+  AudioRingBuffer: MockAudioRingBuffer,
 }));
 
 vi.mock('./logger');
@@ -418,6 +432,85 @@ describe('soniox-lifecycle', () => {
         expect.objectContaining({ sonioxApiKey: 'test-key' }),
         undefined,
       );
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe('audio ring buffer', () => {
+    it('creates ring buffer on connectSoniox', () => {
+      MockAudioRingBuffer.mockClear();
+      connectSoniox(createMockCallbacks());
+
+      expect(MockAudioRingBuffer).toHaveBeenCalledTimes(1);
+    });
+
+    it('pushes audio chunk to ring buffer on each audio callback', () => {
+      connectSoniox(createMockCallbacks());
+      triggerOnConnected();
+
+      const onAudioData = mockAudio.startCapture.mock.calls[0][0] as (chunk: Buffer) => void;
+      const chunk = Buffer.alloc(3200, 0);
+
+      onAudioData(chunk);
+
+      expect(mockRingBufferInstance.push).toHaveBeenCalledWith(chunk);
+    });
+
+    it('pushes every audio chunk to ring buffer', () => {
+      connectSoniox(createMockCallbacks());
+      triggerOnConnected();
+
+      const onAudioData = mockAudio.startCapture.mock.calls[0][0] as (chunk: Buffer) => void;
+      const chunk1 = Buffer.alloc(3200, 1);
+      const chunk2 = Buffer.alloc(3200, 2);
+      const chunk3 = Buffer.alloc(3200, 3);
+
+      onAudioData(chunk1);
+      onAudioData(chunk2);
+      onAudioData(chunk3);
+
+      expect(mockRingBufferInstance.push).toHaveBeenCalledTimes(3);
+      expect(mockRingBufferInstance.push).toHaveBeenNthCalledWith(1, chunk1);
+      expect(mockRingBufferInstance.push).toHaveBeenNthCalledWith(2, chunk2);
+      expect(mockRingBufferInstance.push).toHaveBeenNthCalledWith(3, chunk3);
+    });
+
+    it('clears and nulls ring buffer on resetLifecycle', () => {
+      connectSoniox(createMockCallbacks());
+      triggerOnConnected();
+
+      mockRingBufferInstance.clear.mockClear();
+      resetLifecycle();
+
+      expect(mockRingBufferInstance.clear).toHaveBeenCalledTimes(1);
+
+      // After reset, a new connectSoniox should create a new instance
+      MockAudioRingBuffer.mockClear();
+      connectSoniox(createMockCallbacks());
+      expect(MockAudioRingBuffer).toHaveBeenCalledTimes(1);
+    });
+
+    it('ring buffer persists across disconnect/reconnect', () => {
+      vi.useFakeTimers();
+
+      connectSoniox(createMockCallbacks());
+      triggerOnConnected();
+
+      // Send some audio
+      const onAudioData = mockAudio.startCapture.mock.calls[0][0] as (chunk: Buffer) => void;
+      onAudioData(Buffer.alloc(3200, 0));
+
+      mockRingBufferInstance.clear.mockClear();
+      MockAudioRingBuffer.mockClear();
+
+      // Disconnect and reconnect
+      triggerOnDisconnected(1006, 'connection lost');
+      vi.advanceTimersByTime(1000);
+
+      // Ring buffer should NOT have been cleared or re-created
+      expect(mockRingBufferInstance.clear).not.toHaveBeenCalled();
+      expect(MockAudioRingBuffer).not.toHaveBeenCalled();
 
       vi.useRealTimers();
     });

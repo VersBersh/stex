@@ -4,6 +4,7 @@ import { getSettings } from './settings';
 import { classifyAudioError, classifyDisconnect } from './error-classification';
 import { getReconnectDelay } from './reconnect-policy';
 import { MIN_DB, computeDbFromPcm16, createAudioLevelMonitor, createSoundEventDetector, type AudioLevelMonitor, type SoundEventDetector } from './audio-level-monitor';
+import { AudioRingBuffer } from './audio-ring-buffer';
 import type { SonioxToken, ErrorInfo, SessionState } from '../shared/types';
 import { debug, info, warn, error } from './logger';
 
@@ -25,6 +26,7 @@ let levelMonitor: AudioLevelMonitor | null = null;
 let audioChunkCount = 0;
 let soundEventDetector: SoundEventDetector | null = null;
 let awaitingFinalization = false;
+let ringBuffer: AudioRingBuffer | null = null;
 
 export function isConnected(): boolean {
   return soniox?.connected ?? false;
@@ -68,6 +70,8 @@ export function resetLifecycle(): void {
   soniox?.disconnect();
   soniox = null;
   storedContextText = null;
+  ringBuffer?.clear();
+  ringBuffer = null;
   levelMonitor = null;
   audioChunkCount = 0;
   flushSoundEvent();
@@ -119,6 +123,7 @@ function handleDisconnect(code: number, reason: string): void {
 }
 
 function onAudioData(chunk: Buffer): void {
+  ringBuffer?.push(chunk);
   soniox?.sendAudio(chunk);
   const dB = computeDbFromPcm16(chunk);
   audioChunkCount++;
@@ -170,6 +175,7 @@ export function resumeCapture(): void {
 
 export function connectSoniox(callbacks: SonioxLifecycleCallbacks, contextText?: string): void {
   audioChunkCount = 0;
+  ringBuffer = new AudioRingBuffer();
   activeCallbacks = callbacks;
   storedContextText = contextText ?? null;
   levelMonitor = createAudioLevelMonitor();
