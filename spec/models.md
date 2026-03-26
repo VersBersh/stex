@@ -2,7 +2,7 @@
 
 ## SonioxToken
 
-A single token received from the Soniox WebSocket API.
+A single token from the Soniox transcription pipeline. Inside `SonioxClient`, `start_ms` and `end_ms` are connection-relative (reset to 0 for each new WebSocket). The lifecycle layer (`soniox-lifecycle.ts`) offsets these timestamps by `connectionBaseMs` before forwarding to consumers, so tokens received via IPC or lifecycle callbacks have `start_ms`/`end_ms` in session audio time — a monotonic timeline spanning the entire dictation session regardless of connection handoffs.
 
 ```typescript
 interface SonioxToken {

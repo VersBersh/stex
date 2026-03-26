@@ -27,6 +27,7 @@ let audioChunkCount = 0;
 let soundEventDetector: SoundEventDetector | null = null;
 let awaitingFinalization = false;
 let ringBuffer: AudioRingBuffer | null = null;
+let connectionBaseMs = 0;
 
 export function isConnected(): boolean {
   return soniox?.connected ?? false;
@@ -63,6 +64,15 @@ function flushSoundEvent(): void {
   }
 }
 
+export function applyTimestampOffset(tokens: SonioxToken[], offsetMs: number): SonioxToken[] {
+  if (offsetMs === 0) return tokens;
+  return tokens.map(t => ({
+    ...t,
+    start_ms: t.start_ms + offsetMs,
+    end_ms: t.end_ms + offsetMs,
+  }));
+}
+
 export function resetLifecycle(): void {
   debug('Lifecycle reset');
   cancelReconnect();
@@ -70,6 +80,7 @@ export function resetLifecycle(): void {
   soniox?.disconnect();
   soniox = null;
   storedContextText = null;
+  connectionBaseMs = 0;
   ringBuffer?.clear();
   ringBuffer = null;
   levelMonitor = null;
@@ -185,6 +196,7 @@ export function connectSoniox(callbacks: SonioxLifecycleCallbacks, contextText?:
   const keyPreview = keyLen > 4 ? settings.sonioxApiKey.slice(0, 4) + '...' : '(empty)';
   info('Connecting to Soniox (key=%s, len=%d)', keyPreview, keyLen);
 
+  const baseMs = connectionBaseMs;
   soniox = new SonioxClient({
     onConnected: () => {
       info('Soniox connected, starting audio capture');
@@ -202,10 +214,10 @@ export function connectSoniox(callbacks: SonioxLifecycleCallbacks, contextText?:
       callbacks.onStatusChange('recording');
     },
     onFinalTokens: (tokens: SonioxToken[]) => {
-      callbacks.onFinalTokens(tokens);
+      callbacks.onFinalTokens(applyTimestampOffset(tokens, baseMs));
     },
     onNonFinalTokens: (tokens: SonioxToken[]) => {
-      callbacks.onNonFinalTokens(tokens);
+      callbacks.onNonFinalTokens(applyTimestampOffset(tokens, baseMs));
     },
     onFinished: () => {
       callbacks.onFinalizationComplete();
@@ -236,6 +248,7 @@ function attemptReconnect(): void {
   if (!callbacks) return;
 
   const settings = getSettings();
+  const baseMs = connectionBaseMs;
 
   soniox = new SonioxClient({
     onConnected: () => {
@@ -244,10 +257,10 @@ function attemptReconnect(): void {
       callbacks.onError(null);
     },
     onFinalTokens: (tokens: SonioxToken[]) => {
-      callbacks.onFinalTokens(tokens);
+      callbacks.onFinalTokens(applyTimestampOffset(tokens, baseMs));
     },
     onNonFinalTokens: (tokens: SonioxToken[]) => {
-      callbacks.onNonFinalTokens(tokens);
+      callbacks.onNonFinalTokens(applyTimestampOffset(tokens, baseMs));
     },
     onFinished: () => {
       callbacks.onFinalizationComplete();

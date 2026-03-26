@@ -88,7 +88,7 @@ vi.mock('./audio-ring-buffer', () => ({
 
 vi.mock('./logger');
 
-import { connectSoniox, isConnected, finalizeSoniox, sendAudio, resumeCapture, cancelReconnect, resetLifecycle } from './soniox-lifecycle';
+import { connectSoniox, isConnected, finalizeSoniox, sendAudio, resumeCapture, cancelReconnect, resetLifecycle, applyTimestampOffset } from './soniox-lifecycle';
 
 function createMockCallbacks() {
   return {
@@ -511,6 +511,108 @@ describe('soniox-lifecycle', () => {
       // Ring buffer should NOT have been cleared or re-created
       expect(mockRingBufferInstance.clear).not.toHaveBeenCalled();
       expect(MockAudioRingBuffer).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe('applyTimestampOffset', () => {
+    it('returns same array reference when offsetMs is 0', () => {
+      const tokens = [
+        { text: 'hello', start_ms: 100, end_ms: 200, confidence: 0.9, is_final: true },
+      ];
+      const result = applyTimestampOffset(tokens, 0);
+      expect(result).toBe(tokens);
+    });
+
+    it('offsets start_ms and end_ms by offsetMs', () => {
+      const tokens = [
+        { text: 'hello', start_ms: 100, end_ms: 200, confidence: 0.9, is_final: true },
+        { text: 'world', start_ms: 300, end_ms: 400, confidence: 0.8, is_final: true },
+      ];
+      const result = applyTimestampOffset(tokens, 5000);
+      expect(result).toEqual([
+        { text: 'hello', start_ms: 5100, end_ms: 5200, confidence: 0.9, is_final: true },
+        { text: 'world', start_ms: 5300, end_ms: 5400, confidence: 0.8, is_final: true },
+      ]);
+    });
+
+    it('preserves all non-timestamp fields', () => {
+      const tokens = [
+        { text: 'hello', start_ms: 100, end_ms: 200, confidence: 0.95, is_final: false, speaker: 'A' },
+      ];
+      const result = applyTimestampOffset(tokens, 1000);
+      expect(result[0].text).toBe('hello');
+      expect(result[0].confidence).toBe(0.95);
+      expect(result[0].is_final).toBe(false);
+      expect(result[0].speaker).toBe('A');
+    });
+
+    it('returns new array and new objects when offset is non-zero', () => {
+      const tokens = [
+        { text: 'hello', start_ms: 100, end_ms: 200, confidence: 0.9, is_final: true },
+      ];
+      const result = applyTimestampOffset(tokens, 500);
+      expect(result).not.toBe(tokens);
+      expect(result[0]).not.toBe(tokens[0]);
+    });
+
+    it('handles empty array', () => {
+      const result = applyTimestampOffset([], 5000);
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('connectionBaseMs', () => {
+    it('initial connection passes tokens through with offset 0 (unchanged)', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+
+      const tokens = [
+        { text: 'hello', start_ms: 100, end_ms: 200, confidence: 0.9, is_final: true },
+      ];
+      mockSonioxInstance._events.onFinalTokens?.(tokens);
+
+      // With connectionBaseMs = 0, tokens pass through unchanged (same reference)
+      expect(callbacks.onFinalTokens).toHaveBeenCalledWith(tokens);
+      expect(callbacks.onFinalTokens.mock.calls[0][0]).toBe(tokens);
+    });
+
+    it('initial connection passes non-final tokens through unchanged', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+
+      const tokens = [
+        { text: 'hel', start_ms: 50, end_ms: 100, confidence: 0.5, is_final: false },
+      ];
+      mockSonioxInstance._events.onNonFinalTokens?.(tokens);
+
+      expect(callbacks.onNonFinalTokens).toHaveBeenCalledWith(tokens);
+      expect(callbacks.onNonFinalTokens.mock.calls[0][0]).toBe(tokens);
+    });
+
+    it('reconnect passes tokens through with offset 0 (unchanged)', () => {
+      vi.useFakeTimers();
+
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+      triggerOnDisconnected(1006, 'connection lost');
+
+      vi.advanceTimersByTime(1000);
+      // Reconnected — trigger onConnected on the new client
+      mockSonioxInstance.connected = true;
+      mockSonioxInstance._events.onConnected?.();
+
+      const tokens = [
+        { text: 'hello', start_ms: 100, end_ms: 200, confidence: 0.9, is_final: true },
+      ];
+      mockSonioxInstance._events.onFinalTokens?.(tokens);
+
+      expect(callbacks.onFinalTokens).toHaveBeenCalledWith(tokens);
+      expect(callbacks.onFinalTokens.mock.calls[0][0]).toBe(tokens);
 
       vi.useRealTimers();
     });
