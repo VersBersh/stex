@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "debug": "cross-env SEED_EDITOR=true npm run start",
-    "dist": "npm run build && electron-builder --win"
+    "build:dist": "webpack --mode production --config webpack.main.config.js && webpack --mode production --config webpack.preload.config.js && webpack --mode production --config webpack.renderer.config.js",
+    "dist": "npm run build:dist && electron-builder --win"
   },
   "dependencies": {
     "@lexical/react": "^0.22.0",
