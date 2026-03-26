@@ -181,21 +181,3 @@ export function stopAudioCapture(): void {
     audioContext = null;
   }
 }
-
-export async function enumerateAudioInputDevices(): Promise<string[]> {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    stream.getTracks().forEach(t => t.stop());
-  } catch {
-    // Permission denied — labels may be empty
-  }
-
-  try {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    return devices
-      .filter(d => d.kind === 'audioinput' && d.label)
-      .map(d => d.label);
-  } catch {
-    return [];
-  }
-}
