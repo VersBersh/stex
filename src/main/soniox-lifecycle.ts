@@ -34,6 +34,7 @@ let replayPhase: 'idle' | 'replaying' | 'draining' = 'idle';
 let postResumeLiveBuffer: Buffer[] = [];
 let replayEndRelativeMs = 0;
 let replayDrainTimer: ReturnType<typeof setTimeout> | null = null;
+let replayZeroTokenTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function isConnected(): boolean {
   return soniox?.connected ?? false;
@@ -114,6 +115,10 @@ export function endReplayPhase(): void {
     clearTimeout(replayDrainTimer);
     replayDrainTimer = null;
   }
+  if (replayZeroTokenTimer) {
+    clearTimeout(replayZeroTokenTimer);
+    replayZeroTokenTimer = null;
+  }
   // Only flush buffered live audio if the connection is still alive
   if (soniox?.connected) {
     info('Flushing %d buffered live audio chunks', postResumeLiveBuffer.length);
@@ -127,6 +132,7 @@ export function endReplayPhase(): void {
 }
 
 const REPLAY_DRAIN_TIMEOUT_MS = 10000;
+const REPLAY_ZERO_TOKEN_TIMEOUT_MS = 3000;
 const REPLAY_SAMPLE_RATE = 16000;
 const REPLAY_BYTES_PER_SAMPLE = 2;
 
@@ -161,6 +167,16 @@ export function sendReplayAudio(fromMs: number): void {
       endReplayPhase();
     }
   }, REPLAY_DRAIN_TIMEOUT_MS);
+
+  // Zero-token fast path: if no final tokens arrive within 3s, assume silence-only replay
+  if (replayZeroTokenTimer) clearTimeout(replayZeroTokenTimer);
+  replayZeroTokenTimer = setTimeout(() => {
+    replayZeroTokenTimer = null;
+    if (replayPhase === 'draining') {
+      info('Zero tokens received after %dms — ending replay phase (silence-only)', REPLAY_ZERO_TOKEN_TIMEOUT_MS);
+      endReplayPhase();
+    }
+  }, REPLAY_ZERO_TOKEN_TIMEOUT_MS);
 }
 
 export function resetLifecycle(): void {
@@ -179,6 +195,10 @@ export function resetLifecycle(): void {
   if (replayDrainTimer) {
     clearTimeout(replayDrainTimer);
     replayDrainTimer = null;
+  }
+  if (replayZeroTokenTimer) {
+    clearTimeout(replayZeroTokenTimer);
+    replayZeroTokenTimer = null;
   }
   ringBuffer?.clear();
   ringBuffer = null;
@@ -416,6 +436,11 @@ export function reconnectWithContext(
 
       // Check if replay draining is complete
       if (replayPhase === 'draining' && tokens.length > 0) {
+        // Cancel zero-token fast path — tokens arrived, use normal drain heuristic
+        if (replayZeroTokenTimer) {
+          clearTimeout(replayZeroTokenTimer);
+          replayZeroTokenTimer = null;
+        }
         const lastTokenEndMs = tokens[tokens.length - 1].end_ms;
         if (lastTokenEndMs >= replayEndRelativeMs - 50) {
           info('Replay draining complete (lastTokenEnd=%d, replayEnd=%d)',
@@ -428,6 +453,11 @@ export function reconnectWithContext(
     },
     onNonFinalTokens: (tokens: SonioxToken[]) => {
       const baseMs = connectionBaseMs;
+      // Cancel zero-token fast path if non-final tokens arrive during drain (speech detected)
+      if (replayPhase === 'draining' && tokens.length > 0 && replayZeroTokenTimer) {
+        clearTimeout(replayZeroTokenTimer);
+        replayZeroTokenTimer = null;
+      }
       lastNonFinalStartMs = tokens.length > 0 ? baseMs + tokens[0].start_ms : null;
       callbacks.onNonFinalTokens(applyTimestampOffset(tokens, baseMs));
     },

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // --- Hoisted mocks ---
 
@@ -45,6 +45,7 @@ const { mockSonioxInstance, MockSonioxClient, mockAudio, mockSettingsData, mockR
   const mockRingBufferInstance = {
     push: vi.fn(),
     sliceFrom: vi.fn(),
+    sliceFromWithMeta: vi.fn(),
     clear: vi.fn(),
     currentMs: 0,
     oldestMs: null as number | null,
@@ -88,7 +89,7 @@ vi.mock('./audio-ring-buffer', () => ({
 
 vi.mock('./logger');
 
-import { connectSoniox, isConnected, finalizeSoniox, sendAudio, resumeCapture, reconnectWithContext, cancelReconnect, resetLifecycle, applyTimestampOffset, capturePendingStartMs, getPendingStartMs } from './soniox-lifecycle';
+import { connectSoniox, isConnected, finalizeSoniox, sendAudio, resumeCapture, reconnectWithContext, cancelReconnect, resetLifecycle, applyTimestampOffset, capturePendingStartMs, getPendingStartMs, beginReplayPhase, sendReplayAudio, isInReplayPhase } from './soniox-lifecycle';
 
 function createMockCallbacks() {
   return {
@@ -837,6 +838,112 @@ describe('soniox-lifecycle', () => {
       expect(callbacks.onFinalTokens).toHaveBeenCalledWith([
         { text: 'hello', start_ms: 5100, end_ms: 5200, confidence: 0.9, is_final: true },
       ]);
+    });
+  });
+
+  describe('replay drain — zero-token timeout', () => {
+    // 2 seconds of audio at 16kHz, 16-bit = 64000 bytes → replayEndRelativeMs = 2000
+    const REPLAY_AUDIO_BYTES = 64000;
+    let disconnectCalls: number;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      disconnectCalls = 0;
+      mockSonioxInstance.disconnect.mockImplementation(() => { disconnectCalls++; });
+      mockAudio.startCapture.mockImplementation(vi.fn());
+      mockRingBufferInstance.sliceFromWithMeta.mockReturnValue({
+        data: Buffer.alloc(REPLAY_AUDIO_BYTES, 0),
+        actualStartMs: 0,
+      });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    function setupReplayDrain(callbacks: ReturnType<typeof createMockCallbacks>) {
+      connectSoniox(callbacks);
+      triggerOnConnected();
+      beginReplayPhase();
+      reconnectWithContext('fresh context', {
+        onReady: () => sendReplayAudio(0),
+      });
+      triggerOnConnected();
+      // Now in 'draining' phase with zero-token timer (3s) and safety timer (10s) running
+    }
+
+    it('ends replay phase after 3 seconds when zero tokens received', () => {
+      const callbacks = createMockCallbacks();
+      setupReplayDrain(callbacks);
+
+      expect(isInReplayPhase()).toBe(true);
+
+      vi.advanceTimersByTime(3000);
+
+      expect(isInReplayPhase()).toBe(false);
+    });
+
+    it('does not end replay via zero-token timer when final tokens arrive', () => {
+      const callbacks = createMockCallbacks();
+      setupReplayDrain(callbacks);
+
+      // Tokens arrive but don't reach the drain threshold (end_ms < replayEndRelativeMs - 50)
+      mockSonioxInstance._events.onFinalTokens?.([
+        { text: 'partial', start_ms: 0, end_ms: 500, confidence: 0.9, is_final: true },
+      ]);
+
+      // Advance past the 3s zero-token timeout
+      vi.advanceTimersByTime(3000);
+
+      // Still in replay — zero-token timer was cancelled, waiting for drain heuristic or 10s
+      expect(isInReplayPhase()).toBe(true);
+    });
+
+    it('does not end replay via zero-token timer when non-final tokens arrive', () => {
+      const callbacks = createMockCallbacks();
+      setupReplayDrain(callbacks);
+
+      // Non-final tokens arrive — speech is being processed
+      mockSonioxInstance._events.onNonFinalTokens?.([
+        { text: 'hel', start_ms: 0, end_ms: 300, confidence: 0.5, is_final: false },
+      ]);
+
+      // Advance past the 3s zero-token timeout
+      vi.advanceTimersByTime(3000);
+
+      // Still in replay — zero-token timer was cancelled by non-final tokens
+      expect(isInReplayPhase()).toBe(true);
+    });
+
+    it('ends replay via normal drain heuristic when tokens reach threshold', () => {
+      const callbacks = createMockCallbacks();
+      setupReplayDrain(callbacks);
+
+      // Tokens reach the replay end (end_ms >= replayEndRelativeMs - 50 = 1950)
+      mockSonioxInstance._events.onFinalTokens?.([
+        { text: 'hello', start_ms: 0, end_ms: 2000, confidence: 0.9, is_final: true },
+      ]);
+
+      // Replay should end immediately — no timer advancement needed
+      expect(isInReplayPhase()).toBe(false);
+    });
+
+    it('10-second safety timeout works as ultimate fallback', () => {
+      const callbacks = createMockCallbacks();
+      setupReplayDrain(callbacks);
+
+      // Tokens arrive (cancelling zero-token timer) but don't reach threshold
+      mockSonioxInstance._events.onFinalTokens?.([
+        { text: 'partial', start_ms: 0, end_ms: 500, confidence: 0.9, is_final: true },
+      ]);
+
+      // 3s zero-token timer should not end it
+      vi.advanceTimersByTime(3000);
+      expect(isInReplayPhase()).toBe(true);
+
+      // Advance to 10s total — safety timeout fires
+      vi.advanceTimersByTime(7000);
+      expect(isInReplayPhase()).toBe(false);
     });
   });
 });

@@ -224,7 +224,7 @@ Replay is considered complete when:
 1. all replay audio has been sent to connection B, and
 2. Soniox has finalized/drained that replay segment on B
 
-Replay draining is detected by comparing incoming finalized token `end_ms` (connection-relative) against the replay audio duration in connection-relative time. The replay audio duration is computed from the byte length of the ring buffer slice at send time and frozen as `replayEndRelativeMs`. This value does NOT use `ringBuffer.currentMs` (which keeps growing as live audio is buffered). A 50ms tolerance accounts for Soniox not producing tokens for trailing silence. A 10-second safety timeout forces replay completion if the heuristic doesn't trigger. Once draining is complete, `endReplayPhase()` flushes buffered post-resume live audio to connection B.
+Replay draining is detected by comparing incoming finalized token `end_ms` (connection-relative) against the replay audio duration in connection-relative time. The replay audio duration is computed from the byte length of the ring buffer slice at send time and frozen as `replayEndRelativeMs`. This value does NOT use `ringBuffer.currentMs` (which keeps growing as live audio is buffered). A 50ms tolerance accounts for Soniox not producing tokens for trailing silence. If no final tokens are received within 3 seconds of entering the drain phase, the replay is considered complete immediately — this handles the case where replay audio contains only silence and Soniox produces no tokens. A 10-second safety timeout remains as the ultimate fallback whenever replay draining has not completed by any other mechanism. Once draining is complete, `endReplayPhase()` flushes buffered post-resume live audio to connection B.
 
 ### What changes where
 

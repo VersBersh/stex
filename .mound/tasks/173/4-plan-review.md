@@ -1,0 +1,9 @@
+**Verdict** — `Approved with Notes`
+
+**Plan Issues**
+1. Major — Step 7: The proposed token-arrival tests will not exercise the replay drain heuristic if they only call `sendReplayAudio()` on the current client. That heuristic exists only in `reconnectWithContext()`’s reconnect-side `onFinalTokens` handler at [soniox-lifecycle.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-e7cef9bd/src/main/soniox-lifecycle.ts#L408). Fix by structuring those tests around an actual reconnect flow: `connectSoniox()` to create the ring buffer, `beginReplayPhase()`, `reconnectWithContext(..., { onReady: () => sendReplayAudio(...) })`, trigger the new client’s `onConnected`, then drive `onFinalTokens` on that reconnect client.
+
+2. Minor — Steps 1-3: `drainReceivedFinalTokens` is not strictly necessary. The simpler fit with the existing code is to clear `replayZeroTokenTimer` on the first non-empty final-token batch and avoid an extra module-level flag entirely. If the flag is kept, reset it in `endReplayPhase()` as well as `resetLifecycle()` so replay state does not linger between runs.
+
+**Spec Update Issues**
+1. Minor — `spec/proposal-context-refresh.md`: The proposed wording says the 10-second timeout is the fallback “for cases where tokens are received but the drain heuristic doesn't converge.” That is narrower than the actual lifecycle logic, which arms the 10-second timer for every drain attempt at [soniox-lifecycle.ts](/C:/code/draftable/stex/.mound/worktrees/worker-1-e7cef9bd/src/main/soniox-lifecycle.ts#L155). Reword it to say the 3-second timer is the zero-final-token fast path, while the 10-second timer remains the ultimate fallback whenever replay draining still has not completed.
