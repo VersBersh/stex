@@ -113,7 +113,7 @@ interface AppSettings {
   launchOnStartup: boolean;
   onHide: "clipboard" | "none";   // what to do with text when window hides
   onShow: "fresh" | "append";     // "fresh" clears editor on show, "append" keeps previous text
-  audioInputDevice: string | null;  // PortAudio device name, null = system default
+  audioInputDevice: string | null;  // MediaDeviceInfo.label from getUserMedia, null = system default
   sonioxApiKey: string;            // encrypted at rest via safeStorage
   sonioxModel: string;             // Soniox model identifier
   language: string;                // language hint for Soniox
