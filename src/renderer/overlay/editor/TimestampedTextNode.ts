@@ -57,10 +57,6 @@ export class TimestampedTextNode extends TextNode {
     return super.createDOM(config);
   }
 
-  updateDOM(prevNode: TimestampedTextNode, dom: HTMLElement, config: EditorConfig): boolean {
-    return super.updateDOM(prevNode, dom, config);
-  }
-
   exportJSON(): SerializedTimestampedTextNode {
     return {
       ...super.exportJSON(),

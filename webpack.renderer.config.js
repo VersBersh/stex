@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
@@ -41,6 +42,9 @@ module.exports = {
       template: './src/renderer/settings/index.html',
       filename: 'settings/index.html',
       chunks: ['settings'],
+    }),
+    new webpack.DefinePlugin({
+      '__SEED_EDITOR__': JSON.stringify(process.env.SEED_EDITOR === 'true'),
     }),
   ],
 };

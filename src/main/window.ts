@@ -89,6 +89,13 @@ function createOverlayWindowInternal(): BrowserWindow {
   const win = new BrowserWindow(opts);
   win.loadFile(path.join(__dirname, '../renderer/overlay/index.html'));
 
+  // Ctrl+Shift+I opens DevTools for the overlay window
+  win.webContents.on('before-input-event', (_event, input) => {
+    if (input.control && input.shift && input.key.toLowerCase() === 'i' && input.type === 'keyDown') {
+      win.webContents.toggleDevTools();
+    }
+  });
+
   // Opacity on focus/blur — suppressed during fade-in animation
   let isFading = false;
 
