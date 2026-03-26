@@ -19,6 +19,7 @@
   --input-focus-shadow: rgba(0, 102, 204, 0.15);
   --hotkey-bg: #fff;
   --recorder-active-bg: #f0f7ff;
+  --warning-color: #b35900;
 }
 
 [data-theme="dark"] {
@@ -42,6 +43,7 @@
   --input-focus-shadow: rgba(77, 166, 255, 0.2);
   --hotkey-bg: #333;
   --recorder-active-bg: #1a2a3a;
+  --warning-color: #f0ad4e;
 }
 
 * {
@@ -121,6 +123,10 @@ body {
   font-size: 12px;
   color: var(--text-muted);
   margin-top: 4px;
+}
+
+.setting-group .hint.warning {
+  color: var(--warning-color);
 }
 
 .setting-group input[type="text"],

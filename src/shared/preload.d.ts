@@ -40,12 +40,17 @@ export interface ElectronAPI {
   sendAudioCaptureError(message: string): void;
 }
 
+export interface AudioDeviceResult {
+  devices: string[];
+  labelsUnavailable: boolean;
+}
+
 export interface SettingsAPI {
   log(level: 'debug' | 'info' | 'warn' | 'error', message: string): void;
   getSettings(): Promise<AppSettings>;
   setSetting<K extends keyof AppSettings>(key: K, value: AppSettings[K]): Promise<void>;
   onSettingsUpdated(callback: (settings: AppSettings) => void): () => void;
-  getAudioDevices(): Promise<string[]>;
+  getAudioDevices(): Promise<AudioDeviceResult>;
   getResolvedTheme(): Promise<"light" | "dark">;
   onThemeChanged(callback: (theme: "light" | "dark") => void): () => void;
   getLogPath(): Promise<string | null>;

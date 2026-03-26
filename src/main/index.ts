@@ -7,6 +7,7 @@ import { initHotkeyManager } from './hotkey';
 import { registerAudioIpc } from './audio';
 import { initThemeManager } from './theme';
 import { initSessionManager } from './session';
+import { initPermissions } from './permissions';
 import { initLogger, debug } from './logger';
 import { registerLogIpc } from './log-ipc';
 
@@ -25,6 +26,9 @@ export function initApp(): void {
 
   initThemeManager();
   debug('initApp: theme manager initialized (%.0fms)', performance.now() - t0);
+
+  initPermissions();
+  debug('initApp: permissions initialized (%.0fms)', performance.now() - t0);
 
   initWindowManager();
   debug('initApp: window manager initialized (%.0fms)', performance.now() - t0);

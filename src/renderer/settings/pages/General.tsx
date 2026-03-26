@@ -5,9 +5,10 @@ interface Props {
   settings: AppSettings;
   onSettingChange: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   audioDevices: string[];
+  micLabelsUnavailable: boolean;
 }
 
-export function General({ settings, onSettingChange, audioDevices }: Props) {
+export function General({ settings, onSettingChange, audioDevices, micLabelsUnavailable }: Props) {
   const [logPath, setLogPath] = useState<string | null>(null);
 
   useEffect(() => {
@@ -89,6 +90,11 @@ export function General({ settings, onSettingChange, audioDevices }: Props) {
             </option>
           ))}
         </select>
+        {micLabelsUnavailable && (
+          <p className="hint warning">
+            Unable to read audio device names. Check that microphone access is allowed in your system privacy settings.
+          </p>
+        )}
       </div>
 
       <div className="setting-group">

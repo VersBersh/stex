@@ -19,18 +19,15 @@ const settingsApi: SettingsAPI = {
 
   getAudioDevices: async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => t.stop());
-    } catch {
-      // Permission denied — labels may be empty
-    }
-    try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      return devices
-        .filter(d => d.kind === 'audioinput' && d.label)
-        .map(d => d.label);
+      const audioInputs = devices.filter(d => d.kind === 'audioinput');
+      const labeled = audioInputs.filter(d => d.label);
+      return {
+        devices: labeled.map(d => d.label),
+        labelsUnavailable: audioInputs.length > 0 && labeled.length === 0,
+      };
     } catch {
-      return [];
+      return { devices: [], labelsUnavailable: false };
     }
   },
 

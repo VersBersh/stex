@@ -7,6 +7,7 @@ const {
   mockRegisterSettingsIpc,
   mockRegisterAudioIpc,
   mockInitThemeManager,
+  mockInitPermissions,
   mockInitWindowManager,
   mockInitSessionManager,
   mockInitTray,
@@ -18,6 +19,7 @@ const {
   const mockRegisterSettingsIpc = vi.fn();
   const mockRegisterAudioIpc = vi.fn();
   const mockInitThemeManager = vi.fn();
+  const mockInitPermissions = vi.fn();
   const mockInitWindowManager = vi.fn();
   const mockInitSessionManager = vi.fn();
   const mockInitTray = vi.fn();
@@ -29,6 +31,7 @@ const {
     mockRegisterSettingsIpc,
     mockRegisterAudioIpc,
     mockInitThemeManager,
+    mockInitPermissions,
     mockInitWindowManager,
     mockInitSessionManager,
     mockInitTray,
@@ -82,6 +85,10 @@ vi.mock('./hotkey', () => ({
   initHotkeyManager: (...args: unknown[]) => mockInitHotkeyManager(...args),
 }));
 
+vi.mock('./permissions', () => ({
+  initPermissions: (...args: unknown[]) => mockInitPermissions(...args),
+}));
+
 vi.mock('./log-ipc', () => ({
   registerLogIpc: (...args: unknown[]) => mockRegisterLogIpc(...args),
 }));
@@ -122,6 +129,7 @@ describe('First-run experience', () => {
     expect(mockRegisterSettingsIpc).toHaveBeenCalledOnce();
     expect(mockRegisterAudioIpc).toHaveBeenCalledOnce();
     expect(mockInitThemeManager).toHaveBeenCalledOnce();
+    expect(mockInitPermissions).toHaveBeenCalledOnce();
     expect(mockInitWindowManager).toHaveBeenCalledOnce();
     expect(mockInitSessionManager).toHaveBeenCalledOnce();
     expect(mockInitTray).toHaveBeenCalledOnce();
@@ -136,6 +144,7 @@ describe('First-run experience', () => {
     expect(mockRegisterSettingsIpc).toHaveBeenCalledOnce();
     expect(mockRegisterAudioIpc).toHaveBeenCalledOnce();
     expect(mockInitThemeManager).toHaveBeenCalledOnce();
+    expect(mockInitPermissions).toHaveBeenCalledOnce();
     expect(mockInitWindowManager).toHaveBeenCalledOnce();
     expect(mockInitSessionManager).toHaveBeenCalledOnce();
     expect(mockInitTray).toHaveBeenCalledOnce();

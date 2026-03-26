@@ -28,18 +28,25 @@ const TABS: { id: TabId; label: string }[] = [
 function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [audioDevices, setAudioDevices] = useState<string[]>([]);
+  const [micLabelsUnavailable, setMicLabelsUnavailable] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('api-key');
 
   useEffect(() => {
     window.settingsApi.getSettings().then(setSettings);
-    window.settingsApi.getAudioDevices().then(setAudioDevices);
+    window.settingsApi.getAudioDevices().then((result) => {
+      setAudioDevices(result.devices);
+      setMicLabelsUnavailable(result.labelsUnavailable);
+    });
 
     const unsubscribe = window.settingsApi.onSettingsUpdated((updated) => {
       setSettings(updated);
     });
 
     const handleFocus = () => {
-      window.settingsApi.getAudioDevices().then(setAudioDevices);
+      window.settingsApi.getAudioDevices().then((result) => {
+        setAudioDevices(result.devices);
+        setMicLabelsUnavailable(result.labelsUnavailable);
+      });
     };
     window.addEventListener('focus', handleFocus);
 
@@ -92,6 +99,7 @@ function App() {
             settings={settings}
             onSettingChange={handleSettingChange}
             audioDevices={audioDevices}
+            micLabelsUnavailable={micLabelsUnavailable}
           />
         )}
       </main>
