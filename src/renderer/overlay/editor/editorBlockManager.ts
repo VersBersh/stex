@@ -23,7 +23,10 @@ export function createEditorBlockManager() {
     },
 
     commitFinalTokens(tokens: SonioxToken[]): void {
-      const text = tokens.map((t) => t.text).join('');
+      manager.commitFinalText(tokens.map((t) => t.text).join(''));
+    },
+
+    commitFinalText(text: string): void {
       if (text.length === 0) return;
 
       const lastBlock = blocks[blocks.length - 1];
