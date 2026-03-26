@@ -366,6 +366,53 @@ describe('AudioRingBuffer', () => {
     });
   });
 
+  describe('sliceFromWithMeta', () => {
+    it('returns actual chunk start timestamp', () => {
+      buf.push(taggedPcm(1600, 10)); // 0ms
+      buf.push(taggedPcm(1600, 20)); // 100ms
+      buf.push(taggedPcm(1600, 30)); // 200ms
+
+      // 150ms falls inside 100-200ms chunk, so actualStartMs should be 100
+      const result = buf.sliceFromWithMeta(150);
+      expect(result).not.toBeNull();
+      expect(result!.actualStartMs).toBe(100);
+      expect(result!.data.readInt16LE(0)).toBe(20);
+    });
+
+    it('returns null when ms before oldest', () => {
+      // Push enough to evict first chunks
+      for (let i = 0; i < 15; i++) {
+        buf.push(pcm(1600));
+      }
+
+      const oldest = buf.oldestMs!;
+      expect(oldest).toBeGreaterThan(0);
+      expect(buf.sliceFromWithMeta(oldest - 1)).toBeNull();
+    });
+
+    it('returns null when ms >= currentMs', () => {
+      buf.push(pcm(1600)); // 0-100ms
+      expect(buf.sliceFromWithMeta(100)).toBeNull();
+    });
+
+    it('returns data from exact chunk boundary', () => {
+      buf.push(taggedPcm(1600, 10)); // 0ms
+      buf.push(taggedPcm(1600, 20)); // 100ms
+      buf.push(taggedPcm(1600, 30)); // 200ms
+
+      const result = buf.sliceFromWithMeta(100);
+      expect(result).not.toBeNull();
+      expect(result!.actualStartMs).toBe(100);
+      expect(result!.data.readInt16LE(0)).toBe(20);
+      // Should include chunks from 100ms and 200ms
+      expect(result!.data.length).toBe(2 * 3200);
+    });
+
+    it('returns null for empty buffer', () => {
+      expect(buf.sliceFromWithMeta(0)).toBeNull();
+    });
+  });
+
   describe('default capacity', () => {
     it('uses 5-minute capacity by default', () => {
       const defaultBuf = new AudioRingBuffer();

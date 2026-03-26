@@ -34,6 +34,7 @@ export interface ElectronAPI {
   onThemeChanged(callback: (theme: 'light' | 'dark') => void): () => void;
   onSessionError(callback: (error: ErrorInfo | null) => void): () => void;
   onAudioLevel(callback: (dB: number) => void): () => void;
+  onReplayGhostConvert(callback: (replayGhostStartMs: number) => void): () => void;
 
   // Audio capture (Main → Renderer commands, Renderer → Main data)
   onAudioStartCapture(callback: (deviceName: string | null) => void): () => void;

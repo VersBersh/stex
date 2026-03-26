@@ -30,6 +30,10 @@ let ringBuffer: AudioRingBuffer | null = null;
 let connectionBaseMs = 0;
 let lastNonFinalStartMs: number | null = null;
 let pendingStartMs: number | null = null;
+let replayPhase: 'idle' | 'replaying' | 'draining' = 'idle';
+let postResumeLiveBuffer: Buffer[] = [];
+let replayEndRelativeMs = 0;
+let replayDrainTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function isConnected(): boolean {
   return soniox?.connected ?? false;
@@ -88,6 +92,77 @@ export function getPendingStartMs(): number | null {
   return pendingStartMs;
 }
 
+export interface ReplayConfig {
+  replayStartMs: number;
+  replayGhostStartMs: number;
+}
+
+export function isInReplayPhase(): boolean {
+  return replayPhase !== 'idle';
+}
+
+export function beginReplayPhase(): void {
+  replayPhase = 'replaying';
+  postResumeLiveBuffer = [];
+  replayEndRelativeMs = 0;
+}
+
+export function endReplayPhase(): void {
+  replayPhase = 'idle';
+  replayEndRelativeMs = 0;
+  if (replayDrainTimer) {
+    clearTimeout(replayDrainTimer);
+    replayDrainTimer = null;
+  }
+  // Only flush buffered live audio if the connection is still alive
+  if (soniox?.connected) {
+    info('Flushing %d buffered live audio chunks', postResumeLiveBuffer.length);
+    for (const chunk of postResumeLiveBuffer) {
+      soniox.sendAudio(chunk);
+    }
+  } else if (postResumeLiveBuffer.length > 0) {
+    warn('Discarding %d buffered live audio chunks (no active connection)', postResumeLiveBuffer.length);
+  }
+  postResumeLiveBuffer = [];
+}
+
+const REPLAY_DRAIN_TIMEOUT_MS = 10000;
+const REPLAY_SAMPLE_RATE = 16000;
+const REPLAY_BYTES_PER_SAMPLE = 2;
+
+export function sendReplayAudio(fromMs: number): void {
+  const slice = ringBuffer?.sliceFromWithMeta(fromMs);
+  if (!slice || slice.data.length === 0) {
+    warn('No replay audio available from %dms', fromMs);
+    endReplayPhase();
+    return;
+  }
+
+  // Update connectionBaseMs to the actual start of the ring buffer slice.
+  connectionBaseMs = slice.actualStartMs;
+  info('Sending replay audio: %d bytes from actualStart=%dms (requested=%dms)',
+    slice.data.length, slice.actualStartMs, fromMs);
+
+  // Compute the replay audio duration in connection-relative time.
+  const replayAudioDurationMs = (slice.data.length / REPLAY_BYTES_PER_SAMPLE / REPLAY_SAMPLE_RATE) * 1000;
+  replayEndRelativeMs = replayAudioDurationMs;
+
+  soniox?.sendAudio(slice.data);
+
+  // Move to draining phase — waiting for Soniox to process the replay audio
+  replayPhase = 'draining';
+
+  // Safety timeout: if draining doesn't complete naturally, force end
+  if (replayDrainTimer) clearTimeout(replayDrainTimer);
+  replayDrainTimer = setTimeout(() => {
+    replayDrainTimer = null;
+    if (replayPhase === 'draining') {
+      warn('Replay drain timeout after %dms — forcing end of replay phase', REPLAY_DRAIN_TIMEOUT_MS);
+      endReplayPhase();
+    }
+  }, REPLAY_DRAIN_TIMEOUT_MS);
+}
+
 export function resetLifecycle(): void {
   debug('Lifecycle reset');
   cancelReconnect();
@@ -98,6 +173,13 @@ export function resetLifecycle(): void {
   connectionBaseMs = 0;
   lastNonFinalStartMs = null;
   pendingStartMs = null;
+  replayPhase = 'idle';
+  postResumeLiveBuffer = [];
+  replayEndRelativeMs = 0;
+  if (replayDrainTimer) {
+    clearTimeout(replayDrainTimer);
+    replayDrainTimer = null;
+  }
   ringBuffer?.clear();
   ringBuffer = null;
   levelMonitor = null;
@@ -153,7 +235,14 @@ function handleDisconnect(code: number, reason: string): void {
 
 function onAudioData(chunk: Buffer): void {
   ringBuffer?.push(chunk);
-  soniox?.sendAudio(chunk);
+
+  if (replayPhase !== 'idle') {
+    // During replay, buffer live audio locally instead of sending to Soniox.
+    postResumeLiveBuffer.push(chunk);
+  } else {
+    soniox?.sendAudio(chunk);
+  }
+
   const dB = computeDbFromPcm16(chunk);
   audioChunkCount++;
   if (audioChunkCount === 1) {
@@ -259,7 +348,13 @@ export function connectSoniox(callbacks: SonioxLifecycleCallbacks, contextText?:
   soniox.connect(settings, contextText);
 }
 
-export function reconnectWithContext(contextText: string): void {
+export function reconnectWithContext(
+  contextText: string,
+  options?: {
+    replay?: ReplayConfig;
+    onReady?: () => void;
+  },
+): void {
   if (!activeCallbacks) return;
 
   info('Reconnecting with fresh context (%d chars)', contextText.length);
@@ -268,8 +363,12 @@ export function reconnectWithContext(contextText: string): void {
   soniox?.disconnect();
   soniox = null;
 
-  // Set connectionBaseMs to current session audio time
-  connectionBaseMs = ringBuffer?.currentMs ?? 0;
+  // Set connectionBaseMs based on replay
+  if (options?.replay) {
+    connectionBaseMs = options.replay.replayStartMs;
+  } else {
+    connectionBaseMs = ringBuffer?.currentMs ?? 0;
+  }
 
   // Update stored context for any future network-error reconnects
   storedContextText = contextText;
@@ -277,16 +376,21 @@ export function reconnectWithContext(contextText: string): void {
   // Reset per-connection state (but NOT the ring buffer)
   audioChunkCount = 0;
   awaitingFinalization = false;
+  lastNonFinalStartMs = null;
   levelMonitor = createAudioLevelMonitor();
   const settings = getSettings();
   soundEventDetector = createSoundEventDetector(settings.silenceThresholdDb);
 
   const callbacks = activeCallbacks;
-  const baseMs = connectionBaseMs;
 
   soniox = new SonioxClient({
     onConnected: () => {
-      info('Soniox reconnected with fresh context, starting audio capture');
+      info('Soniox reconnected with fresh context');
+
+      // Execute post-connect callback first (e.g., send replay audio)
+      // This happens before mic capture starts so replay audio is first in the stream.
+      options?.onReady?.();
+
       try {
         startCapture(onAudioData, onAudioError);
       } catch (err) {
@@ -294,6 +398,7 @@ export function reconnectWithContext(contextText: string): void {
         const errorInfo = classifyAudioError(err as Error);
         soniox?.disconnect();
         soniox = null;
+        if (replayPhase !== 'idle') endReplayPhase();
         callbacks.onStatusChange('error');
         callbacks.onError(errorInfo);
         return;
@@ -301,21 +406,43 @@ export function reconnectWithContext(contextText: string): void {
       callbacks.onStatusChange('recording');
     },
     onFinalTokens: (tokens: SonioxToken[]) => {
+      // Read connectionBaseMs lazily since sendReplayAudio may update it
+      // after client creation.
+      const baseMs = connectionBaseMs;
+
+      if (!soniox?.hasPendingNonFinalTokens) {
+        lastNonFinalStartMs = null;
+      }
+
+      // Check if replay draining is complete
+      if (replayPhase === 'draining' && tokens.length > 0) {
+        const lastTokenEndMs = tokens[tokens.length - 1].end_ms;
+        if (lastTokenEndMs >= replayEndRelativeMs - 50) {
+          info('Replay draining complete (lastTokenEnd=%d, replayEnd=%d)',
+            lastTokenEndMs, replayEndRelativeMs);
+          endReplayPhase();
+        }
+      }
+
       callbacks.onFinalTokens(applyTimestampOffset(tokens, baseMs));
     },
     onNonFinalTokens: (tokens: SonioxToken[]) => {
+      const baseMs = connectionBaseMs;
+      lastNonFinalStartMs = tokens.length > 0 ? baseMs + tokens[0].start_ms : null;
       callbacks.onNonFinalTokens(applyTimestampOffset(tokens, baseMs));
     },
     onFinished: () => {
       callbacks.onFinalizationComplete();
     },
     onDisconnected: (code: number, reason: string) => {
+      if (replayPhase !== 'idle') endReplayPhase();
       handleDisconnect(code, reason);
     },
     onError: (err: Error) => {
       error('Soniox error during context reconnect: %s', err.message);
       stopCapture();
       callbacks.onAudioLevel?.(MIN_DB);
+      if (replayPhase !== 'idle') endReplayPhase();
       callbacks.onStatusChange('error');
       callbacks.onError({ type: 'unknown', message: err.message });
     },

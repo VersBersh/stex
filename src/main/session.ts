@@ -6,7 +6,7 @@ import { flashTrayIcon } from './tray';
 import { IpcChannels } from '../shared/ipc';
 import type { SessionState, SonioxToken, ErrorInfo, ResumeAnalysisResult } from '../shared/types';
 import { registerSessionIpc } from './session-ipc';
-import { connectSoniox, finalizeSoniox, isConnected, hasPendingNonFinalTokens, resumeCapture, reconnectWithContext, cancelReconnect, resetLifecycle, capturePendingStartMs } from './soniox-lifecycle';
+import { connectSoniox, finalizeSoniox, isConnected, hasPendingNonFinalTokens, resumeCapture, reconnectWithContext, cancelReconnect, resetLifecycle, capturePendingStartMs, getPendingStartMs, beginReplayPhase, sendReplayAudio } from './soniox-lifecycle';
 import { MIN_DB } from './audio-level-monitor';
 import { sendToRenderer, sendStatus, sendError, clearError } from './renderer-send';
 import { copyEditorTextToClipboard } from './session-clipboard';
@@ -166,7 +166,7 @@ async function resumeSession(): Promise<void> {
 
   try {
     // Request resume analysis from renderer
-    const { editorWasModified, editorText } = await getResumeAnalysis();
+    const { editorWasModified, replayAnalysis, editorText } = await getResumeAnalysis();
 
     // Check if session was cancelled during the await (e.g. user dismissed overlay)
     if (status !== 'paused') {
@@ -175,8 +175,43 @@ async function resumeSession(): Promise<void> {
     }
 
     if (editorWasModified) {
-      info('Editor modified during pause, reconnecting with fresh context (%d chars)', editorText.length);
-      reconnectWithContext(editorText);
+      // Compute effective replay start
+      const pendingStartMs = getPendingStartMs();
+      let effectiveReplayStartMs: number | null = null;
+
+      if (replayAnalysis.eligible) {
+        effectiveReplayStartMs = pendingStartMs != null
+          ? Math.min(replayAnalysis.replayStartMs!, pendingStartMs)
+          : replayAnalysis.replayStartMs;
+      } else {
+        effectiveReplayStartMs = pendingStartMs ?? null;
+      }
+
+      const canReplay = replayAnalysis.eligible && effectiveReplayStartMs != null;
+
+      if (canReplay) {
+        info('Editor modified during pause, reconnecting with replay (ghostStart=%d, replayStart=%d)',
+          replayAnalysis.replayGhostStartMs, effectiveReplayStartMs);
+        beginReplayPhase();
+
+        const ghostStartMs = replayAnalysis.replayGhostStartMs!;
+        const replayStartMs = effectiveReplayStartMs!;
+
+        reconnectWithContext(editorText, {
+          replay: {
+            replayStartMs,
+            replayGhostStartMs: ghostStartMs,
+          },
+          onReady: () => {
+            // Connection B is now open. Safe to convert and replay.
+            sendToRenderer(IpcChannels.SESSION_REPLAY_GHOST_CONVERT, ghostStartMs);
+            sendReplayAudio(replayStartMs);
+          },
+        });
+      } else {
+        info('Editor modified during pause, reconnecting with fresh context (%d chars)', editorText.length);
+        reconnectWithContext(editorText);
+      }
       // resumeInProgress stays true until onStatusChange fires (recording or error)
       // This prevents re-entrant resume during the websocket handshake gap
     } else {

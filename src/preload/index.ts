@@ -100,6 +100,12 @@ const api: ElectronAPI = {
     return () => { ipcRenderer.removeListener(IpcChannels.AUDIO_LEVEL, handler); };
   },
 
+  onReplayGhostConvert: (callback: (replayGhostStartMs: number) => void) => {
+    const handler = (_event: unknown, replayGhostStartMs: number) => callback(replayGhostStartMs);
+    ipcRenderer.on(IpcChannels.SESSION_REPLAY_GHOST_CONVERT, handler);
+    return () => { ipcRenderer.removeListener(IpcChannels.SESSION_REPLAY_GHOST_CONVERT, handler); };
+  },
+
   // Audio capture (Main → Renderer commands, Renderer → Main data)
   onAudioStartCapture: (callback: (deviceName: string | null) => void) => {
     const handler = (_event: unknown, deviceName: string | null) => callback(deviceName);

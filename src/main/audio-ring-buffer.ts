@@ -3,6 +3,11 @@ const BYTES_PER_SAMPLE = 2;
 const BYTES_PER_MS = (SAMPLE_RATE * BYTES_PER_SAMPLE) / 1000; // 32
 const DEFAULT_CAPACITY_MS = 5 * 60 * 1000; // 5 minutes
 
+export interface AudioSlice {
+  data: Buffer;
+  actualStartMs: number;
+}
+
 interface StoredChunk {
   data: Buffer;
   startMs: number;
@@ -53,6 +58,32 @@ export class AudioRingBuffer {
     return Buffer.concat(
       this.chunks.slice(idx).map((c) => c.data),
     );
+  }
+
+  sliceFromWithMeta(ms: number): AudioSlice | null {
+    if (this.chunks.length === 0) return null;
+    if (ms < this.chunks[0].startMs) return null;
+    if (ms >= this.currentMs) return null;
+
+    // Binary search for the last chunk with startMs <= ms
+    let lo = 0;
+    let hi = this.chunks.length - 1;
+    let idx = 0;
+
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1;
+      if (this.chunks[mid].startMs <= ms) {
+        idx = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+
+    return {
+      data: Buffer.concat(this.chunks.slice(idx).map((c) => c.data)),
+      actualStartMs: this.chunks[idx].startMs,
+    };
   }
 
   clear(): void {

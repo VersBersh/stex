@@ -29,5 +29,6 @@ export const IpcChannels = {
   LOG_PATH_GET: 'log:get-path',
   LOG_REVEAL: 'log:reveal',
   SESSION_RESUME_ANALYSIS: 'session:resume-analysis',
+  SESSION_REPLAY_GHOST_CONVERT: 'session:replay-ghost-convert',
   LOG_FROM_RENDERER: 'log:from-renderer',
 } as const;

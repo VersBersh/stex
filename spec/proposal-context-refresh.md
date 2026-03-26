@@ -136,7 +136,7 @@ On resume after an edit:
 
 1. Close connection A (no audio is flowing, so no finalization needed)
 2. Open connection B with the full editor text as `context.text`
-3. If re-transcription is eligible, convert the eligible clean tail into a replay ghost region
+3. If re-transcription is eligible, main sends `SESSION_REPLAY_GHOST_CONVERT` IPC to the renderer with `replayGhostStartMs` after connection B's `onConnected` fires. The renderer converts the clean tail to ghost text in a synchronous `historic`-tagged Lexical update and manually syncs the `editorBlockManager`. Ghost conversion fires only after connection B is confirmed open — if connection B fails, the editor is unchanged.
 4. Replay the buffered audio for that region to B
 5. B's non-final/final tokens refill that region through the normal ghost/final commit path
 6. Mic capture restarts immediately on resume, but captured live audio is buffered locally during replay
@@ -224,7 +224,7 @@ Replay is considered complete when:
 1. all replay audio has been sent to connection B, and
 2. Soniox has finalized/drained that replay segment on B
 
-Only after that point may buffered post-resume live audio be flushed to B.
+Replay draining is detected by comparing incoming finalized token `end_ms` (connection-relative) against the replay audio duration in connection-relative time. The replay audio duration is computed from the byte length of the ring buffer slice at send time and frozen as `replayEndRelativeMs`. This value does NOT use `ringBuffer.currentMs` (which keeps growing as live audio is buffered). A 50ms tolerance accounts for Soniox not producing tokens for trailing silence. A 10-second safety timeout forces replay completion if the heuristic doesn't trigger. Once draining is complete, `endReplayPhase()` flushes buffered post-resume live audio to connection B.
 
 ### What changes where
 
@@ -232,6 +232,7 @@ Only after that point may buffered post-resume live audio be flushed to B.
 - Stores timestamped audio chunks in a circular buffer
 - `push(chunk)` — append audio, advance time counter
 - `sliceFrom(ms)` — return all buffered audio from the given timestamp onward
+- `sliceFromWithMeta(ms)` — return `{ data: Buffer, actualStartMs: number }` so the caller can set `connectionBaseMs = actualStartMs` for correct timestamp mapping. The `actualStartMs` may differ from the requested `ms` due to chunk-boundary alignment.
 - `clear()` — reset
 
 **`soniox-lifecycle.ts`** — Changes:
@@ -290,7 +291,7 @@ If `blockedReason !== 'none'`, replay is skipped but reconnect still uses fresh 
 - `SonioxClient` — the WebSocket client itself is unchanged. The lifecycle layer creates a new instance for the new connection.
 - Audio capture — pause/resume semantics are unchanged.
 - Editor rendering — ghost text and committed text rendering are unchanged.
-- The ghost-text concept is unchanged, but it now has two sources in v1: live non-final tokens and replay-in-progress tail text.
+- The ghost-text concept is unchanged, but it now has two sources in v1: live non-final tokens and replay-in-progress tail text. The two sources are temporally exclusive — during replay, live audio is buffered locally and no live non-final tokens arrive. The ghost text CSS property (`--ghost-text-content`) is shared; no structural change to ghost text rendering is needed.
 - Inline editing during active transcription — unchanged; context refresh only applies to the pause-edit-resume flow in v1.
 
 ## Risks and open questions

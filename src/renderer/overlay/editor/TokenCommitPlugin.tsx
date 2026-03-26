@@ -12,6 +12,8 @@ import { $isCursorAtDocumentEnd, $moveCursorToDocumentEnd } from './cursor-track
 import { $createTimestampedTextNode, $isTimestampedTextNode } from './TimestampedTextNode';
 import { isVerboseEditorLog, verboseLog } from './verboseEditorLog';
 import { mergeTokens, flushPending, type MergedToken } from './tokenMerger';
+import { $convertToReplayGhost } from './replayGhostConversion';
+import { escapeForCSSContent } from './ghost-text-utils';
 import type { HistoryState } from '@lexical/history';
 import type { EditorBlockManager, BlockHistory } from './editorBlockManager';
 import type { SonioxToken } from '../../../shared/types';
@@ -218,6 +220,52 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
       unsubPaused();
       unsubStop();
     };
+  }, [editor, blockManager, historyState, blockHistory]);
+
+  // Convert clean tail to replay ghost text when replay starts
+  useEffect(() => {
+    const unsubReplayGhost = window.api.onReplayGhostConvert((replayGhostStartMs: number) => {
+      let ghostText = '';
+      let removedCharCount = 0;
+
+      editor.update(
+        () => {
+          const result = $convertToReplayGhost(replayGhostStartMs);
+          ghostText = result.ghostText;
+          removedCharCount = result.removedCharCount;
+        },
+        { discrete: true, tag: 'historic' },
+      );
+
+      // Set initial replay ghost text via CSS (same mechanism as GhostTextPlugin)
+      if (ghostText) {
+        const rootElement = editor.getRootElement();
+        if (rootElement) {
+          rootElement.style.setProperty('--ghost-text-content', escapeForCSSContent(ghostText));
+        }
+      }
+
+      // Sync blockManager: remove the tail text that was moved to ghost
+      if (removedCharCount > 0) {
+        const docLen = blockManager.getDocumentLength();
+        blockManager.applyEdit(docLen - removedCharCount, removedCharCount, '');
+      }
+
+      // Flush pending tokens — replay starts a fresh token stream
+      const flushed = flushPending(pendingRef.current);
+      pendingRef.current = [];
+      if (flushed) {
+        commitWords([flushed]);
+      }
+
+      // Reset undo/redo since the document state has changed
+      historyState.undoStack.length = 0;
+      historyState.redoStack.length = 0;
+      historyState.current = { editor, editorState: editor.getEditorState() };
+      blockHistory.clear();
+    });
+
+    return unsubReplayGhost;
   }, [editor, blockManager, historyState, blockHistory]);
 
   return null;
