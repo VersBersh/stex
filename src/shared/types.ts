@@ -64,6 +64,19 @@ export const SILENCE_THRESHOLD_MAX = -10;
 
 export type ResolvedTheme = "light" | "dark";
 
+export interface ReplayAnalysisResult {
+  eligible: boolean;
+  replayStartMs: number | null;
+  replayGhostStartMs: number | null;
+  blockedReason: 'none' | 'paragraph-boundary' | 'dirty-tail' | 'too-far-from-end';
+}
+
+export interface ResumeAnalysisResult {
+  editorWasModified: boolean;
+  replayAnalysis: ReplayAnalysisResult;
+  editorText: string;
+}
+
 export interface TranscriptionRecord {
   id: string;
   text: string;

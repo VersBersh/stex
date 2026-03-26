@@ -498,27 +498,45 @@ describe('Session Manager', () => {
       mockAudio.startCapture.mockClear();
     });
 
-    it('restarts audio capture on resume', () => {
-      triggerResumeIpc();
+    function respondNoEdit() {
+      const handler = mockIpcMainHandlers.get(IpcChannels.SESSION_RESUME_ANALYSIS);
+      handler?.({}, {
+        editorWasModified: false,
+        replayAnalysis: { eligible: false, replayStartMs: null, replayGhostStartMs: null, blockedReason: 'none' },
+        editorText: '',
+      });
+    }
 
-      expect(mockAudio.startCapture).toHaveBeenCalled();
+    it('restarts audio capture on resume', async () => {
+      triggerResumeIpc();
+      respondNoEdit();
+
+      await vi.waitFor(() => {
+        expect(mockAudio.startCapture).toHaveBeenCalled();
+      });
     });
 
-    it('sends SESSION_RESUMED IPC', () => {
+    it('sends SESSION_RESUMED IPC', async () => {
       triggerResumeIpc();
+      respondNoEdit();
 
-      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
-        IpcChannels.SESSION_RESUMED,
-      );
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_RESUMED,
+        );
+      });
     });
 
-    it('transitions to recording status', () => {
+    it('transitions to recording status', async () => {
       triggerResumeIpc();
+      respondNoEdit();
 
-      expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
-        IpcChannels.SESSION_STATUS,
-        'recording',
-      );
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_STATUS,
+          'recording',
+        );
+      });
     });
   });
 
@@ -1148,6 +1166,201 @@ describe('Session Manager', () => {
           'append',
         );
       });
+    });
+  });
+
+  describe('resumeSession with context refresh', () => {
+    async function startAndPause() {
+      mockOverlayWindow.isVisible.mockReturnValue(false);
+      requestToggle();
+      triggerOnConnected();
+      triggerPauseIpc();
+      triggerOnFinished();
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_PAUSED,
+        );
+      });
+      mockOverlayWindow.webContents.send.mockClear();
+      mockAudio.startCapture.mockClear();
+      mockSonioxInstance.disconnect.mockClear();
+      mockSonioxInstance.connect.mockClear();
+    }
+
+    function respondToResumeAnalysis(result: {
+      editorWasModified: boolean;
+      replayAnalysis: { eligible: boolean; replayStartMs: number | null; replayGhostStartMs: number | null; blockedReason: string };
+      editorText: string;
+    }) {
+      const handler = mockIpcMainHandlers.get(IpcChannels.SESSION_RESUME_ANALYSIS);
+      handler?.({}, result);
+    }
+
+    it('normal resume when no edit (blockedReason: none)', async () => {
+      await startAndPause();
+      triggerResumeIpc();
+
+      await vi.waitFor(() => {
+        expect(mockIpcMainHandlers.has(IpcChannels.SESSION_RESUME_ANALYSIS)).toBe(true);
+      });
+
+      respondToResumeAnalysis({
+        editorWasModified: false,
+        replayAnalysis: { eligible: false, replayStartMs: null, replayGhostStartMs: null, blockedReason: 'none' },
+        editorText: '',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockAudio.startCapture).toHaveBeenCalled();
+      });
+
+      // Should NOT have disconnected/reconnected
+      expect(mockSonioxInstance.disconnect).not.toHaveBeenCalled();
+      expect(mockSonioxInstance.connect).not.toHaveBeenCalled();
+    });
+
+    it('reconnects when editor was modified (eligible: true)', async () => {
+      await startAndPause();
+      triggerResumeIpc();
+
+      await vi.waitFor(() => {
+        expect(mockIpcMainHandlers.has(IpcChannels.SESSION_RESUME_ANALYSIS)).toBe(true);
+      });
+
+      respondToResumeAnalysis({
+        editorWasModified: true,
+        replayAnalysis: { eligible: true, replayStartMs: 5000, replayGhostStartMs: 5000, blockedReason: 'none' },
+        editorText: 'corrected text',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+          expect.objectContaining({ sonioxApiKey: 'test-key' }),
+          'corrected text',
+        );
+      });
+
+      // resumeCapture should NOT have been called directly (reconnectWithContext handles it)
+      expect(mockAudio.startCapture).not.toHaveBeenCalled();
+    });
+
+    it('reconnects when editor was modified (blockedReason: dirty-tail)', async () => {
+      await startAndPause();
+      triggerResumeIpc();
+
+      await vi.waitFor(() => {
+        expect(mockIpcMainHandlers.has(IpcChannels.SESSION_RESUME_ANALYSIS)).toBe(true);
+      });
+
+      respondToResumeAnalysis({
+        editorWasModified: true,
+        replayAnalysis: { eligible: false, replayStartMs: null, replayGhostStartMs: null, blockedReason: 'dirty-tail' },
+        editorText: 'edited text',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+          expect.objectContaining({ sonioxApiKey: 'test-key' }),
+          'edited text',
+        );
+      });
+    });
+
+    it('reconnects when editor was modified (blockedReason: too-far-from-end)', async () => {
+      await startAndPause();
+      triggerResumeIpc();
+
+      await vi.waitFor(() => {
+        expect(mockIpcMainHandlers.has(IpcChannels.SESSION_RESUME_ANALYSIS)).toBe(true);
+      });
+
+      respondToResumeAnalysis({
+        editorWasModified: true,
+        replayAnalysis: { eligible: false, replayStartMs: null, replayGhostStartMs: null, blockedReason: 'too-far-from-end' },
+        editorText: 'far away edit',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+          expect.objectContaining({ sonioxApiKey: 'test-key' }),
+          'far away edit',
+        );
+      });
+    });
+
+    it('sends SESSION_RESUMED in both paths', async () => {
+      // Test reconnect path
+      await startAndPause();
+      triggerResumeIpc();
+
+      await vi.waitFor(() => {
+        expect(mockIpcMainHandlers.has(IpcChannels.SESSION_RESUME_ANALYSIS)).toBe(true);
+      });
+
+      respondToResumeAnalysis({
+        editorWasModified: true,
+        replayAnalysis: { eligible: true, replayStartMs: 5000, replayGhostStartMs: 5000, blockedReason: 'none' },
+        editorText: 'edited',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_RESUMED,
+        );
+      });
+    });
+
+    it('sends SESSION_RESUMED in normal resume path', async () => {
+      await startAndPause();
+      triggerResumeIpc();
+
+      await vi.waitFor(() => {
+        expect(mockIpcMainHandlers.has(IpcChannels.SESSION_RESUME_ANALYSIS)).toBe(true);
+      });
+
+      respondToResumeAnalysis({
+        editorWasModified: false,
+        replayAnalysis: { eligible: false, replayStartMs: null, replayGhostStartMs: null, blockedReason: 'none' },
+        editorText: '',
+      });
+
+      await vi.waitFor(() => {
+        expect(mockOverlayWindow.webContents.send).toHaveBeenCalledWith(
+          IpcChannels.SESSION_RESUMED,
+        );
+      });
+    });
+
+    it('timeout falls back to normal resume', async () => {
+      await startAndPause();
+
+      vi.useFakeTimers();
+      triggerResumeIpc();
+
+      // Don't respond to the analysis request — let it time out
+      await vi.advanceTimersByTimeAsync(1000);
+
+      // Should have fallen back to normal resume (no reconnect)
+      expect(mockAudio.startCapture).toHaveBeenCalled();
+      expect(mockSonioxInstance.connect).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it('prevents re-entrant resume', async () => {
+      await startAndPause();
+      mockOverlayWindow.webContents.send.mockClear();
+
+      // Call resume twice
+      triggerResumeIpc();
+      triggerResumeIpc();
+
+      // Only one analysis request should have been sent
+      const sendCalls = mockOverlayWindow.webContents.send.mock.calls;
+      const analysisCalls = sendCalls.filter(
+        (call: unknown[]) => call[0] === IpcChannels.SESSION_RESUME_ANALYSIS,
+      );
+      expect(analysisCalls).toHaveLength(1);
     });
   });
 });

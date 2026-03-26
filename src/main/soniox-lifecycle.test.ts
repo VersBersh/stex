@@ -88,7 +88,7 @@ vi.mock('./audio-ring-buffer', () => ({
 
 vi.mock('./logger');
 
-import { connectSoniox, isConnected, finalizeSoniox, sendAudio, resumeCapture, cancelReconnect, resetLifecycle, applyTimestampOffset, capturePendingStartMs, getPendingStartMs } from './soniox-lifecycle';
+import { connectSoniox, isConnected, finalizeSoniox, sendAudio, resumeCapture, reconnectWithContext, cancelReconnect, resetLifecycle, applyTimestampOffset, capturePendingStartMs, getPendingStartMs } from './soniox-lifecycle';
 
 function createMockCallbacks() {
   return {
@@ -706,6 +706,137 @@ describe('soniox-lifecycle', () => {
       expect(callbacks.onFinalTokens.mock.calls[0][0]).toBe(tokens);
 
       vi.useRealTimers();
+    });
+  });
+
+  describe('reconnectWithContext', () => {
+    // The MockSonioxClient constructor clears disconnect/connect mocks,
+    // so we track disconnect calls via a side-effect array.
+    let disconnectCalls: number;
+
+    beforeEach(() => {
+      disconnectCalls = 0;
+      mockSonioxInstance.disconnect.mockImplementation(() => { disconnectCalls++; });
+      // Ensure startCapture doesn't carry a throwing impl from earlier tests
+      mockAudio.startCapture.mockImplementation(vi.fn());
+    });
+
+    it('disconnects old client and connects new one with context', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks, 'old context');
+      triggerOnConnected();
+      disconnectCalls = 0;
+
+      reconnectWithContext('corrected text');
+
+      expect(disconnectCalls).toBe(1);
+      expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+        expect.objectContaining({ sonioxApiKey: 'test-key' }),
+        'corrected text',
+      );
+    });
+
+    it('starts audio capture on new connection connected event', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+      mockAudio.startCapture.mockClear();
+
+      reconnectWithContext('text');
+      triggerOnConnected();
+
+      expect(mockAudio.startCapture).toHaveBeenCalled();
+    });
+
+    it('sets status to recording after reconnect', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+      callbacks.onStatusChange.mockClear();
+
+      reconnectWithContext('text');
+      triggerOnConnected();
+
+      expect(callbacks.onStatusChange).toHaveBeenCalledWith('recording');
+    });
+
+    it('preserves ring buffer across reconnect', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+
+      // Send some audio to populate ring buffer
+      const onAudioData = mockAudio.startCapture.mock.calls[0][0] as (chunk: Buffer) => void;
+      onAudioData(Buffer.alloc(3200, 0));
+
+      mockRingBufferInstance.clear.mockClear();
+      MockAudioRingBuffer.mockClear();
+
+      reconnectWithContext('text');
+
+      // Ring buffer should NOT have been cleared or re-created
+      expect(mockRingBufferInstance.clear).not.toHaveBeenCalled();
+      expect(MockAudioRingBuffer).not.toHaveBeenCalled();
+    });
+
+    it('updates stored context text for future network reconnects', () => {
+      vi.useFakeTimers();
+
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks, 'old context');
+      triggerOnConnected();
+
+      reconnectWithContext('fresh');
+      triggerOnConnected();
+      mockSonioxInstance.connect.mockClear();
+
+      // Trigger a network disconnect on the new connection
+      triggerOnDisconnected(1006, 'connection lost');
+
+      // Advance past reconnect delay
+      vi.advanceTimersByTime(1000);
+
+      expect(mockSonioxInstance.connect).toHaveBeenCalledWith(
+        expect.objectContaining({ sonioxApiKey: 'test-key' }),
+        'fresh',
+      );
+
+      vi.useRealTimers();
+    });
+
+    it('handles audio capture error on reconnected connection', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+      callbacks.onStatusChange.mockClear();
+
+      reconnectWithContext('text');
+      mockAudio.startCapture.mockImplementation(() => { throw new Error('No mic'); });
+      triggerOnConnected();
+
+      expect(callbacks.onStatusChange).toHaveBeenCalledWith('error');
+    });
+
+    it('offsets tokens by connectionBaseMs from ring buffer', () => {
+      const callbacks = createMockCallbacks();
+      connectSoniox(callbacks);
+      triggerOnConnected();
+
+      // Simulate ring buffer having accumulated 5000ms of audio
+      mockRingBufferInstance.currentMs = 5000;
+
+      reconnectWithContext('text');
+      mockAudio.startCapture.mockClear();
+      triggerOnConnected();
+
+      const tokens = [
+        { text: 'hello', start_ms: 100, end_ms: 200, confidence: 0.9, is_final: true },
+      ];
+      mockSonioxInstance._events.onFinalTokens?.(tokens);
+
+      expect(callbacks.onFinalTokens).toHaveBeenCalledWith([
+        { text: 'hello', start_ms: 5100, end_ms: 5200, confidence: 0.9, is_final: true },
+      ]);
     });
   });
 });

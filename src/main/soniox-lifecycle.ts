@@ -259,6 +259,71 @@ export function connectSoniox(callbacks: SonioxLifecycleCallbacks, contextText?:
   soniox.connect(settings, contextText);
 }
 
+export function reconnectWithContext(contextText: string): void {
+  if (!activeCallbacks) return;
+
+  info('Reconnecting with fresh context (%d chars)', contextText.length);
+
+  // Close old connection (no audio flowing during pause, no finalization needed)
+  soniox?.disconnect();
+  soniox = null;
+
+  // Set connectionBaseMs to current session audio time
+  connectionBaseMs = ringBuffer?.currentMs ?? 0;
+
+  // Update stored context for any future network-error reconnects
+  storedContextText = contextText;
+
+  // Reset per-connection state (but NOT the ring buffer)
+  audioChunkCount = 0;
+  awaitingFinalization = false;
+  levelMonitor = createAudioLevelMonitor();
+  const settings = getSettings();
+  soundEventDetector = createSoundEventDetector(settings.silenceThresholdDb);
+
+  const callbacks = activeCallbacks;
+  const baseMs = connectionBaseMs;
+
+  soniox = new SonioxClient({
+    onConnected: () => {
+      info('Soniox reconnected with fresh context, starting audio capture');
+      try {
+        startCapture(onAudioData, onAudioError);
+      } catch (err) {
+        error('Failed to start audio capture after reconnect: %s', (err as Error).message);
+        const errorInfo = classifyAudioError(err as Error);
+        soniox?.disconnect();
+        soniox = null;
+        callbacks.onStatusChange('error');
+        callbacks.onError(errorInfo);
+        return;
+      }
+      callbacks.onStatusChange('recording');
+    },
+    onFinalTokens: (tokens: SonioxToken[]) => {
+      callbacks.onFinalTokens(applyTimestampOffset(tokens, baseMs));
+    },
+    onNonFinalTokens: (tokens: SonioxToken[]) => {
+      callbacks.onNonFinalTokens(applyTimestampOffset(tokens, baseMs));
+    },
+    onFinished: () => {
+      callbacks.onFinalizationComplete();
+    },
+    onDisconnected: (code: number, reason: string) => {
+      handleDisconnect(code, reason);
+    },
+    onError: (err: Error) => {
+      error('Soniox error during context reconnect: %s', err.message);
+      stopCapture();
+      callbacks.onAudioLevel?.(MIN_DB);
+      callbacks.onStatusChange('error');
+      callbacks.onError({ type: 'unknown', message: err.message });
+    },
+  });
+
+  soniox.connect(settings, contextText);
+}
+
 function attemptReconnect(): void {
   info('Attempting reconnect');
   if (soniox) {

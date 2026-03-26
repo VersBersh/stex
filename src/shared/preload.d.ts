@@ -1,4 +1,4 @@
-import type { AppSettings, SonioxToken, SessionState, ErrorInfo } from './types';
+import type { AppSettings, SonioxToken, SessionState, ErrorInfo, ResumeAnalysisResult } from './types';
 
 export interface ElectronAPI {
   // Invoke (Renderer → Main, request-response)
@@ -12,6 +12,7 @@ export interface ElectronAPI {
   sessionRequestResume(): void;
   sendSessionText(text: string): void;
   sendContextText(text: string): void;
+  sendResumeAnalysis(result: ResumeAnalysisResult): void;
   hideWindow(): void;
   escapeHide(): void;
   openSettings(): void;
@@ -29,6 +30,7 @@ export interface ElectronAPI {
   onSettingsUpdated(callback: (settings: AppSettings) => void): () => void;
   onRequestSessionText(callback: () => void): () => void;
   onRequestContextText(callback: () => void): () => void;
+  onRequestResumeAnalysis(callback: () => void): () => void;
   onThemeChanged(callback: (theme: 'light' | 'dark') => void): () => void;
   onSessionError(callback: (error: ErrorInfo | null) => void): () => void;
   onAudioLevel(callback: (dB: number) => void): () => void;

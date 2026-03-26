@@ -1,0 +1,1 @@
+No struggles. Both conflicts were straightforward import-line merges where HEAD added `capturePendingStartMs`/`getPendingStartMs` and the cherry-picked commit added `reconnectWithContext`. Resolution was to include all imports from both sides.

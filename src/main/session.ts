@@ -4,9 +4,9 @@ import { getOverlayWindow, showOverlay, hideOverlay, setOverlayCloseHandler } fr
 import { getSettings } from './settings';
 import { flashTrayIcon } from './tray';
 import { IpcChannels } from '../shared/ipc';
-import type { SessionState, SonioxToken, ErrorInfo } from '../shared/types';
+import type { SessionState, SonioxToken, ErrorInfo, ResumeAnalysisResult } from '../shared/types';
 import { registerSessionIpc } from './session-ipc';
-import { connectSoniox, finalizeSoniox, isConnected, hasPendingNonFinalTokens, resumeCapture, cancelReconnect, resetLifecycle, capturePendingStartMs } from './soniox-lifecycle';
+import { connectSoniox, finalizeSoniox, isConnected, hasPendingNonFinalTokens, resumeCapture, reconnectWithContext, cancelReconnect, resetLifecycle, capturePendingStartMs } from './soniox-lifecycle';
 import { MIN_DB } from './audio-level-monitor';
 import { sendToRenderer, sendStatus, sendError, clearError } from './renderer-send';
 import { copyEditorTextToClipboard } from './session-clipboard';
@@ -14,9 +14,11 @@ import { info, warn, debug } from './logger';
 
 const FINALIZATION_TIMEOUT_MS = 5000;
 const CONTEXT_FETCH_TIMEOUT_MS = 500;
+const RESUME_ANALYSIS_TIMEOUT_MS = 1000;
 let status: SessionState['status'] = 'idle';
 let activeTransition: Promise<void> | null = null;
 let currentFinalizationResolver: (() => void) | null = null;
+let resumeInProgress = false;
 let initialized = false;
 
 function waitForFinalization(timeoutMs = FINALIZATION_TIMEOUT_MS): Promise<void> {
@@ -54,6 +56,7 @@ function createLifecycleCallbacks() {
     },
     onStatusChange: (newStatus: SessionState['status']) => {
       status = newStatus;
+      resumeInProgress = false;
       sendStatus(status);
     },
     onError: (error: ErrorInfo | null) => {
@@ -84,6 +87,28 @@ function getEditorContextText(): Promise<string> {
 
     ipcMain.once(IpcChannels.SESSION_CONTEXT, handler);
     sendToRenderer(IpcChannels.SESSION_CONTEXT);
+  });
+}
+
+function getResumeAnalysis(): Promise<ResumeAnalysisResult> {
+  return new Promise<ResumeAnalysisResult>((resolve) => {
+    const handler = (_event: unknown, result: ResumeAnalysisResult) => {
+      clearTimeout(timer);
+      resolve(result);
+    };
+
+    const timer = setTimeout(() => {
+      ipcMain.removeListener(IpcChannels.SESSION_RESUME_ANALYSIS, handler);
+      warn('Resume analysis timed out after %dms, treating as no edit', RESUME_ANALYSIS_TIMEOUT_MS);
+      resolve({
+        editorWasModified: false,
+        replayAnalysis: { eligible: false, replayStartMs: null, replayGhostStartMs: null, blockedReason: 'none' },
+        editorText: '',
+      });
+    }, RESUME_ANALYSIS_TIMEOUT_MS);
+
+    ipcMain.once(IpcChannels.SESSION_RESUME_ANALYSIS, handler);
+    sendToRenderer(IpcChannels.SESSION_RESUME_ANALYSIS);
   });
 }
 
@@ -134,20 +159,43 @@ async function pauseSession(): Promise<void> {
   sendStatus(status);
 }
 
-function resumeSession(): void {
-  if (status !== 'paused') return;
+async function resumeSession(): Promise<void> {
+  if (status !== 'paused' || resumeInProgress) return;
+  resumeInProgress = true;
   info('Session resuming');
 
   try {
-    resumeCapture();
-  } catch {
-    // Error already reported to callbacks by resumeCapture
-    return;
-  }
+    // Request resume analysis from renderer
+    const { editorWasModified, editorText } = await getResumeAnalysis();
 
-  sendToRenderer(IpcChannels.SESSION_RESUMED);
-  status = 'recording';
-  sendStatus(status);
+    // Check if session was cancelled during the await (e.g. user dismissed overlay)
+    if (status !== 'paused') {
+      resumeInProgress = false;
+      return;
+    }
+
+    if (editorWasModified) {
+      info('Editor modified during pause, reconnecting with fresh context (%d chars)', editorText.length);
+      reconnectWithContext(editorText);
+      // resumeInProgress stays true until onStatusChange fires (recording or error)
+      // This prevents re-entrant resume during the websocket handshake gap
+    } else {
+      // No edit — reuse existing connection, just resume capture
+      try {
+        resumeCapture();
+      } catch {
+        resumeInProgress = false;
+        return;
+      }
+      status = 'recording';
+      resumeInProgress = false;
+      sendStatus(status);
+    }
+
+    sendToRenderer(IpcChannels.SESSION_RESUMED);
+  } catch {
+    resumeInProgress = false;
+  }
 }
 
 async function stopSession(): Promise<void> {
@@ -241,6 +289,7 @@ export function initSessionManager(): void {
   status = 'idle';
   activeTransition = null;
   currentFinalizationResolver = null;
+  resumeInProgress = false;
 
   registerSessionIpc({
     onPause: () => { pauseSession(); },

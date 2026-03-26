@@ -331,7 +331,7 @@ describe('Session Manager — Error Handling & Reconnection', () => {
       expect(mockAudio.startCapture).not.toHaveBeenCalled();
     });
 
-    it('allows user to resume after reconnect', () => {
+    it('allows user to resume after reconnect', async () => {
       triggerOnDisconnected(1006, 'connection lost');
 
       vi.advanceTimersByTime(1000);
@@ -339,8 +339,15 @@ describe('Session Manager — Error Handling & Reconnection', () => {
       mockAudio.startCapture.mockClear();
       mockOverlayWindow.webContents.send.mockClear();
 
-      // User resumes
+      // User resumes — respond to resume analysis with no edit
       triggerResumeIpc();
+      const analysisHandler = mockIpcMainHandlers.get(IpcChannels.SESSION_RESUME_ANALYSIS);
+      analysisHandler?.({}, {
+        editorWasModified: false,
+        replayAnalysis: { eligible: false, replayStartMs: null, replayGhostStartMs: null, blockedReason: 'none' },
+        editorText: '',
+      });
+      await vi.advanceTimersByTimeAsync(0);
 
       expect(mockAudio.startCapture).toHaveBeenCalled();
       expect(getSendCalls(IpcChannels.SESSION_STATUS).pop()?.[1]).toBe('recording');

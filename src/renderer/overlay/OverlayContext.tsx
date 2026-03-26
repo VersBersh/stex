@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useRef, useCallback, useEffect, ty
 import type { LexicalEditor } from 'lexical';
 import { $getRoot } from 'lexical';
 import { $getDocumentText } from './editor/lexicalTextContract';
+import { $analyzeReplayEligibility } from './editor/analyzeReplayEligibility';
 import { createPauseController } from './pauseController';
 import type { ErrorInfo, SessionState } from '../../shared/types';
 import { createSessionLifecycleController } from './sessionLifecycleController';
@@ -200,6 +201,26 @@ export function OverlayProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Respond to main process resume analysis requests
+  useEffect(() => {
+    return window.api.onRequestResumeAnalysis(() => {
+      const editor = editorRef.current;
+      if (!editor) {
+        window.api.sendResumeAnalysis({
+          editorWasModified: false,
+          replayAnalysis: { eligible: false, replayStartMs: null, replayGhostStartMs: null, blockedReason: 'none' },
+          editorText: '',
+        });
+        return;
+      }
+      editor.getEditorState().read(() => {
+        const replayAnalysis = $analyzeReplayEligibility();
+        const editorText = $getDocumentText();
+        const editorWasModified = replayAnalysis.eligible || replayAnalysis.blockedReason !== 'none';
+        window.api.sendResumeAnalysis({ editorWasModified, replayAnalysis, editorText });
+      });
+    });
+  }, []);
 
   // Audio capture: listen for start/stop commands from main process
   useEffect(() => {

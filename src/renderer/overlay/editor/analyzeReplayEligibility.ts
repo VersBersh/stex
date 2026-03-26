@@ -1,15 +1,11 @@
 import { $getRoot, $isParagraphNode, $isTextNode, type TextNode } from 'lexical';
 import { $isTimestampedTextNode } from './TimestampedTextNode';
 import { LEXICAL_PARAGRAPH_SEPARATOR } from './lexicalTextContract';
+import type { ReplayAnalysisResult } from '../../../shared/types';
+
+export type { ReplayAnalysisResult };
 
 export const PROXIMITY_THRESHOLD_CHARS = 100;
-
-export interface ReplayAnalysisResult {
-  eligible: boolean;
-  replayStartMs: number | null;
-  replayGhostStartMs: number | null;
-  blockedReason: 'none' | 'paragraph-boundary' | 'dirty-tail' | 'too-far-from-end';
-}
 
 interface ClassifiedLeaf {
   node: TextNode;

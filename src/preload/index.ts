@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IpcChannels } from '../shared/ipc';
 import type { ElectronAPI } from '../shared/preload';
-import type { AppSettings, SonioxToken, SessionState, ErrorInfo } from '../shared/types';
+import type { AppSettings, SonioxToken, SessionState, ErrorInfo, ResumeAnalysisResult } from '../shared/types';
 
 const api: ElectronAPI = {
   // Send (Renderer → Main, fire-and-forget)
@@ -20,6 +20,8 @@ const api: ElectronAPI = {
   sessionRequestResume: () => ipcRenderer.send(IpcChannels.SESSION_REQUEST_RESUME),
   sendSessionText: (text: string) => ipcRenderer.send(IpcChannels.SESSION_TEXT, text),
   sendContextText: (text: string) => ipcRenderer.send(IpcChannels.SESSION_CONTEXT, text),
+  sendResumeAnalysis: (result: ResumeAnalysisResult) =>
+    ipcRenderer.send(IpcChannels.SESSION_RESUME_ANALYSIS, result),
   hideWindow: () => ipcRenderer.send(IpcChannels.WINDOW_HIDE),
   escapeHide: () => ipcRenderer.send(IpcChannels.WINDOW_ESCAPE_HIDE),
   openSettings: () => ipcRenderer.send(IpcChannels.SESSION_OPEN_SETTINGS),
@@ -71,6 +73,11 @@ const api: ElectronAPI = {
     const handler = () => callback();
     ipcRenderer.on(IpcChannels.SESSION_CONTEXT, handler);
     return () => { ipcRenderer.removeListener(IpcChannels.SESSION_CONTEXT, handler); };
+  },
+  onRequestResumeAnalysis: (callback: () => void) => {
+    const handler = () => callback();
+    ipcRenderer.on(IpcChannels.SESSION_RESUME_ANALYSIS, handler);
+    return () => { ipcRenderer.removeListener(IpcChannels.SESSION_RESUME_ANALYSIS, handler); };
   },
   onSettingsUpdated: (callback: (settings: AppSettings) => void) => {
     const handler = (_event: unknown, settings: AppSettings) => callback(settings);
