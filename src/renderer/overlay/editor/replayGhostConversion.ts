@@ -26,8 +26,9 @@ export function $convertToReplayGhost(replayGhostStartMs: number): ReplayGhostCo
   // Work backwards to find the last paragraph with content
   let targetParagraph = null;
   for (let i = paragraphs.length - 1; i >= 0; i--) {
-    if ($isParagraphNode(paragraphs[i]) && paragraphs[i].getChildrenSize() > 0) {
-      targetParagraph = paragraphs[i];
+    const node = paragraphs[i];
+    if ($isParagraphNode(node) && node.getChildrenSize() > 0) {
+      targetParagraph = node;
       break;
     }
   }
