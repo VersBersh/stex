@@ -131,6 +131,30 @@ describe('mergeTokens', () => {
     ]);
     expect(result.newPending).toEqual([tok(' I', 10740, 10800)]);
   });
+
+  it('buffers the last word of a complete utterance, which flush then emits', () => {
+    // Simulates: user says "hello this is a transcription" then pauses.
+    // All tokens arrive as final, but the last word stays buffered.
+    const r = mergeTokens([], [
+      tok(' hello', 100, 200),
+      tok(' this', 300, 400),
+      tok(' is', 500, 550),
+      tok(' a', 600, 650),
+      tok(' transcription', 700, 900),
+    ]);
+    expect(r.words).toHaveLength(4);
+    expect(r.words.map(w => w.text)).toEqual([' hello', ' this', ' is', ' a']);
+    expect(r.newPending).toEqual([tok(' transcription', 700, 900)]);
+
+    // After a silence timeout, flushPending emits the buffered word
+    const flushed = flushPending(r.newPending);
+    expect(flushed).toEqual({
+      text: ' transcription',
+      startMs: 700,
+      endMs: 900,
+      originalText: ' transcription',
+    });
+  });
 });
 
 describe('flushPending', () => {

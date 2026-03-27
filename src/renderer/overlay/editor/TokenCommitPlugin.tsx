@@ -19,6 +19,11 @@ import type { EditorBlockManager, BlockHistory } from './editorBlockManager';
 import type { SonioxToken } from '../../../shared/types';
 import { useOverlay } from '../OverlayContext';
 
+/** Delay before flushing the pending token buffer after the last final-token batch.
+ *  Must be longer than the typical gap between consecutive Soniox responses
+ *  (~100-200ms during active speech) to avoid flushing mid-word. */
+const PENDING_FLUSH_TIMEOUT_MS = 300;
+
 interface TokenCommitPluginProps {
   blockManager: EditorBlockManager;
   historyState: HistoryState;
@@ -29,6 +34,7 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
   const [editor] = useLexicalComposerContext();
   const { registerClearHook } = useOverlay();
   const pendingRef = useRef<SonioxToken[]>([]);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep block manager and history in sync when the editor is cleared
   useEffect(() => {
@@ -51,12 +57,25 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
     });
   }, [registerClearHook, historyState, editor, blockHistory]);
 
-  // Discard pending token buffer when editor is cleared
+  // Discard pending token buffer and cancel flush timer when editor is cleared
   useEffect(() => {
     return registerClearHook(() => {
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
       pendingRef.current = [];
     });
   }, [registerClearHook]);
+
+  // Clean up flush timer on unmount
+  useEffect(() => {
+    return () => {
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+      }
+    };
+  }, []);
 
   // Commit merged words to blockManager and editor
   function commitWords(words: MergedToken[]) {
@@ -198,6 +217,23 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
       pendingRef.current = newPending;
 
       commitWords(words);
+
+      // Reset flush timer — if no new tokens arrive within the timeout,
+      // flush the pending buffer so the last word appears after a pause.
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+      if (newPending.length > 0) {
+        flushTimerRef.current = setTimeout(() => {
+          flushTimerRef.current = null;
+          const flushed = flushPending(pendingRef.current);
+          pendingRef.current = [];
+          if (flushed) {
+            commitWords([flushed]);
+          }
+        }, PENDING_FLUSH_TIMEOUT_MS);
+      }
     });
 
     return unsubscribe;
@@ -206,6 +242,10 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
   // Flush pending tokens on session pause and stop
   useEffect(() => {
     function flush() {
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
       const flushed = flushPending(pendingRef.current);
       pendingRef.current = [];
       if (flushed) {
@@ -252,6 +292,10 @@ export function TokenCommitPlugin({ blockManager, historyState, blockHistory }: 
       }
 
       // Flush pending tokens — replay starts a fresh token stream
+      if (flushTimerRef.current) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
       const flushed = flushPending(pendingRef.current);
       pendingRef.current = [];
       if (flushed) {
